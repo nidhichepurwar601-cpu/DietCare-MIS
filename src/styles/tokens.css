@@ -1,0 +1,213 @@
+/* ============================================================
+   DietCare HIS — Global Design Tokens (Enterprise V2)
+   Highly professional hospital aesthetic.
+   ============================================================ */
+
+:root {
+  /* ── Brand & Primary (Medical Blue/Teal) ───────────────── */
+  --hospital-primary:       #0277bd; /* A strong medical blue */
+  --hospital-primary-dark:  #01579b;
+  --hospital-primary-light: #039be5;
+  --hospital-primary-soft:  #e1f5fe;
+  --hospital-accent:        #00acc1; /* Cyan accent */
+
+  /* ── Semantic Status Colors (WCAG compliant) ────────────── */
+  --color-success:       #2e7d32;
+  --color-success-soft:  #e8f5e9;
+  --color-success-border:#c8e6c9;
+  
+  --color-warning:       #e65100;
+  --color-warning-soft:  #fff3e0;
+  --color-warning-border:#ffe0b2;
+  
+  --color-error:         #c62828;
+  --color-error-soft:    #ffebee;
+  --color-error-border:  #ffcdd2;
+  
+  --color-info:          #1565c0;
+  --color-info-soft:     #e3f2fd;
+  --color-info-border:   #bbdefb;
+  
+  --color-critical:      #b71c1c;
+  --color-critical-soft: #fce4ec;
+
+  /* ── Light Mode Surfaces ─────────────────────────────────── */
+  --bg-primary:          #f4f6f8; /* Crisp light gray-blue for app background */
+  --bg-secondary:        #eef0f3;
+  --surface:             #ffffff;
+  --surface-hover:       #f9fafb;
+  --surface-raised:      #ffffff;
+  --surface-overlay:     #ffffff;
+
+  /* ── Light Mode Text ─────────────────────────────────────── */
+  --text-primary:        #101828;
+  --text-secondary:      #475467;
+  --text-disabled:       #98a2b3;
+  --text-inverse:        #ffffff;
+  --text-link:           var(--hospital-primary);
+
+  /* ── Light Mode Borders ──────────────────────────────────── */
+  --border:              #e4e7ec;
+  --border-strong:       #d0d5dd;
+  --border-focus:        var(--hospital-primary);
+
+  /* ── Shadows ─────────────────────────────────────────────── */
+  --shadow-xs:  0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow:     0 1px 3px rgba(16, 24, 40, 0.1), 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md:  0 4px 8px -2px rgba(16, 24, 40, 0.1), 0 2px 4px -2px rgba(16, 24, 40, 0.06);
+  --shadow-lg:  0 10px 15px -3px rgba(16, 24, 40, 0.1), 0 4px 6px -4px rgba(16, 24, 40, 0.05);
+  --shadow-xl:  0 20px 25px -5px rgba(16, 24, 40, 0.1), 0 8px 10px -6px rgba(16, 24, 40, 0.1);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--hospital-primary) 30%, transparent);
+
+  /* ── Semantic Aliases ────────────────────────────────────── */
+  --hospital-page:    var(--bg-primary);
+  --hospital-card:    var(--surface);
+  --hospital-border:  var(--border);
+  --hospital-text:    var(--text-primary);
+  --hospital-muted:   var(--text-secondary);
+  --hospital-danger:  var(--color-error);
+  --hospital-warning: var(--color-warning);
+  --hospital-success: var(--color-success);
+  --hospital-radius:  8px; /* Slightly sharper, professional */
+  --hospital-shadow:  var(--shadow-xs); /* Flatter cards for enterprise look */
+
+  /* ── Layout Dimensions ───────────────────────────────────── */
+  --header-height:       60px;
+  --sidebar-expanded:    16rem;
+  --sidebar-collapsed:   4.5rem;
+  --control-height:      40px;
+  --touch-min:           44px; /* Improved touch target size */
+  --content-max-width:   1600px;
+  --page-padding:        1.5rem;
+
+  /* ── Spacing Scale ───────────────────────────────────────── */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+
+  /* ── Typography Scale ────────────────────────────────────── */
+  --font-display:  1.875rem;
+  --font-h1:       1.5rem;
+  --font-h2:       1.25rem;
+  --font-h3:       1.125rem;
+  --font-body:     0.875rem;
+  --font-caption:  0.75rem;
+  --font-label:    0.6875rem;
+
+  /* ── Z-Index Scale ───────────────────────────────────────── */
+  --z-base:    1;
+  --z-raised:  10;
+  --z-header:  30;
+  --z-sidebar: 40;
+  --z-overlay: 50;
+  --z-modal:   80;
+  --z-toast:   120;
+  --z-command: 140;
+
+  /* ── Transitions ─────────────────────────────────────────── */
+  --transition:        150ms ease-in-out;
+  --transition-medium: 250ms ease-in-out;
+  --transition-slow:   350ms ease-in-out;
+
+  /* ── Border Radius ───────────────────────────────────────── */
+  --radius-sm:  4px;
+  --radius:     8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
+  --radius-pill: 999px;
+}
+
+/* ── Dark Mode Token Overrides ─────────────────────────────── */
+:root[data-theme="dark"] {
+  /* Dark palette - deep professional charcoal/blue */
+  --dark-bg-primary:      #0f172a; /* Slate 900 */
+  --dark-bg-secondary:    #1e293b; /* Slate 800 */
+  --dark-surface:         #1e293b; 
+  --dark-surface-hover:   #334155; /* Slate 700 */
+  --dark-border:          #334155; 
+  --dark-text-primary:    #f8fafc; /* Slate 50 */
+  --dark-text-secondary:  #94a3b8; /* Slate 400 */
+
+  /* Apply dark overrides to semantic tokens */
+  --bg-primary:           var(--dark-bg-primary);
+  --bg-secondary:         var(--dark-bg-secondary);
+  --surface:              var(--dark-surface);
+  --surface-hover:        var(--dark-surface-hover);
+  --surface-raised:       #1e293b;
+  --surface-overlay:      #0f172a;
+  --text-primary:         var(--dark-text-primary);
+  --text-secondary:       var(--dark-text-secondary);
+  --text-disabled:        #64748b;
+  --border:               var(--dark-border);
+  --border-strong:        #475569;
+
+  --shadow-xs:  0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow:     0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md:  0 4px 8px -2px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg:  0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl:  0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+
+  --hospital-page:         var(--dark-bg-primary);
+  --hospital-card:         var(--dark-surface);
+  --hospital-border:       var(--dark-border);
+  --hospital-text:         var(--dark-text-primary);
+  --hospital-muted:        var(--dark-text-secondary);
+  --hospital-primary-soft: color-mix(in srgb, var(--hospital-primary) 15%, #1e293b);
+
+  /* Status colors in dark mode */
+  --color-success-soft:    color-mix(in srgb, #2e7d32 20%, #1e293b);
+  --color-warning-soft:    color-mix(in srgb, #e65100 20%, #1e293b);
+  --color-error-soft:      color-mix(in srgb, #c62828 20%, #1e293b);
+  --color-info-soft:       color-mix(in srgb, #1565c0 20%, #1e293b);
+  --color-critical-soft:   color-mix(in srgb, #b71c1c 20%, #1e293b);
+}
+
+/* ── Base Styles ──────────────────────────────────────────── */
+html {
+  font-size: calc(14px * var(--font-scale, 1));
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:focus-visible {
+  outline: 2px solid var(--hospital-primary);
+  outline-offset: 2px;
+}
+
+/* ── Density Adjustments ──────────────────────────────────── */
+:root[data-density="comfortable"] {
+  --control-height: 44px;
+  --page-padding:   2rem;
+  --space-2:        0.6rem;
+  --space-3:        1rem;
+}
+:root[data-density="compact"] {
+  --control-height: 36px;
+  --page-padding:   1rem;
+  --space-2:        0.35rem;
+  --space-3:        0.6rem;
+}
+
+/* ── Reduced Motion ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce),
+       (:root[data-reduced-motion="true"]) {
+  *, *::before, *::after {
+    animation-duration:     0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration:    0.01ms !important;
+    scroll-behavior:        auto !important;
+  }
+}

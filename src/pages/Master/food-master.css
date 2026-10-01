@@ -1,0 +1,200 @@
+/* Food Master modal — compact density, token-based colors */
+
+.food-form {
+  width: 100%;
+  color: var(--text-primary);
+}
+
+/* Compact modal sizing */
+.modal-overlay .food-master-modal {
+  width: min(60vw, 560px) !important;
+  max-width: 560px !important;
+  max-height: 72vh;
+}
+
+/* Identity grid */
+.food-form__identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: var(--space-1) var(--space-2);
+}
+
+.food-field--name {
+  grid-column: 1 / -1;
+}
+
+.food-field__label {
+  display: block;
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-label);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+/* Underline-style inputs for compact density */
+.food-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 28px;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.food-input:focus,
+.food-quantity:focus-within,
+.food-nutrition__input:focus-within {
+  border-color: var(--hospital-primary);
+  box-shadow: 0 2px 0 -1px var(--hospital-primary);
+}
+
+.food-input::placeholder {
+  color: var(--text-disabled);
+}
+
+/* Quantity + unit composite */
+.food-quantity {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color var(--transition);
+}
+
+.food-quantity:focus-within {
+  border-color: var(--hospital-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.food-quantity__value {
+  min-width: 0;
+  flex: 1 1 auto;
+  width: 1%;
+  border: 0;
+  outline: 0;
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  font-family: inherit;
+}
+
+.food-quantity__unit {
+  flex: 0 0 88px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  outline: 0;
+  padding: 0 var(--space-2);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Nutrition section */
+.food-nutrition {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.food-section-heading {
+  margin-bottom: var(--space-2);
+}
+
+.food-section-heading h3 {
+  margin: 0;
+  font-size: var(--font-body);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.food-section-heading p {
+  margin: 2px 0 0;
+  font-size: var(--font-caption);
+  color: var(--text-secondary);
+}
+
+.food-nutrition__grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.food-nutrition__item {
+  min-width: 0;
+}
+
+.food-nutrition__input {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  overflow: hidden;
+  transition: border-color var(--transition);
+}
+
+.food-nutrition__input:focus-within {
+  border-color: var(--hospital-primary);
+}
+
+.food-nutrition__input input {
+  min-width: 0;
+  flex: 1 1 auto;
+  width: 1%;
+  border: 0;
+  outline: 0;
+  padding: var(--space-1) var(--space-1);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  font-family: inherit;
+}
+
+.food-nutrition__input input::placeholder {
+  color: var(--text-disabled);
+}
+
+.food-nutrition__input span {
+  flex: 0 0 auto;
+  padding: 0 var(--space-2) 0 var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .food-nutrition__grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 680px) {
+  .modal-overlay .food-master-modal {
+    width: min(92vw, 520px) !important;
+    max-width: 520px !important;
+    max-height: 84vh;
+  }
+  .food-form__identity { grid-template-columns: 1fr; gap: var(--space-2); }
+  .food-field--name { grid-column: auto; }
+  .food-nutrition__grid { grid-template-columns: repeat(2, 1fr); }
+  .food-quantity__unit { flex-basis: 80px; }
+}
+
+@media (max-width: 420px) {
+  .food-nutrition__grid { grid-template-columns: 1fr; }
+}

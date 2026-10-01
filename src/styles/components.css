@@ -1,0 +1,429 @@
+/* ============================================================
+   DietCare HIS — Shared Component Styles (Enterprise V2)
+   Styles for globally reused UI components.
+   All values reference CSS variables from tokens.css.
+   ============================================================ */
+
+/* ── Command Palette ─────────────────────────────────────────── */
+
+.command-palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-command);
+  display: flex;
+  justify-content: center;
+  padding: 12vh var(--space-4) var(--space-4);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.command-palette {
+  width: min(640px, 100%);
+  max-height: min(72vh, 560px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+}
+
+.command-palette input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--font-h3);
+  background: transparent;
+  color: inherit;
+  outline: none;
+}
+
+.command-palette-list {
+  overflow: auto;
+  padding: var(--space-3);
+}
+
+.command-palette-group {
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.command-palette-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: left;
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-body);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.command-palette-item[aria-selected="true"],
+.command-palette-item:hover {
+  background: var(--surface-hover);
+  color: var(--hospital-primary);
+}
+
+/* ── Skeleton Loader ─────────────────────────────────────────── */
+
+.app-skeleton {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.app-skeleton-line {
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 0%,
+    var(--surface-hover) 50%,
+    var(--bg-secondary) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.app-skeleton-line.md {
+  height: 20px;
+}
+
+.app-skeleton-line.lg {
+  height: 72px;
+}
+
+.app-skeleton-line.xl {
+  height: 120px;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ── Status Chip (generic reuse) ─────────────────────────────── */
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Settings Panel ──────────────────────────────────────────── */
+
+.settings-grid {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.settings-section {
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--hospital-radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-section-title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-h3);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Color swatch buttons */
+.color-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform var(--transition), border-color var(--transition);
+}
+
+.color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.color-swatch[aria-pressed="true"] {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text-primary);
+}
+
+/* ── Auth Screen ─────────────────────────────────────────────── */
+
+.auth-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--bg-primary);
+  position: relative;
+}
+
+.auth-screen::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 50%;
+  background: linear-gradient(135deg, var(--hospital-primary-dark) 0%, var(--hospital-primary) 100%);
+  z-index: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 0 100%);
+}
+
+.auth-card {
+  width: min(980px, 100%);
+  display: grid;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  z-index: 1;
+}
+
+@media (min-width: 860px) {
+  .auth-card {
+    grid-template-columns: 1.05fr 1fr;
+  }
+}
+
+.auth-visual {
+  display: none;
+  min-height: 560px;
+  background:
+    linear-gradient(180deg, rgba(2, 119, 189, 0.4), rgba(1, 87, 155, 0.8)),
+    url("/images/dietcare-login-food-only.jpg") center / cover;
+  color: var(--text-inverse);
+  padding: var(--space-8);
+}
+
+@media (min-width: 860px) {
+  .auth-visual {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+}
+
+.auth-form {
+  padding: var(--space-10) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.auth-mark {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--hospital-primary-light), var(--hospital-primary));
+  color: var(--text-inverse);
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-bottom: var(--space-6);
+  box-shadow: var(--shadow-md);
+}
+
+.auth-input {
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.auth-input:focus {
+  border-color: var(--hospital-primary);
+  background: var(--surface);
+  box-shadow: var(--focus-ring);
+}
+
+.auth-submit {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--hospital-primary);
+  color: var(--text-inverse);
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition);
+  margin-top: var(--space-4);
+}
+
+.auth-submit:hover {
+  background: var(--hospital-primary-dark);
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-link {
+  color: var(--hospital-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Table Panel (DataTable host) ────────────────────────────── */
+
+.app-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--hospital-radius);
+  background: var(--surface);
+}
+
+.app-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-raised);
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-strong);
+}
+
+/* ── Notification Item ───────────────────────────────────────── */
+
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-4);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.notif-item:hover {
+  background: var(--surface-hover);
+}
+
+.notif-item:last-of-type {
+  border-bottom: 0;
+}
+
+/* ── Page-level loading overlay ──────────────────────────────── */
+
+.page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-body);
+}
+
+/* ── Toolbar row (common above-table controls) ───────────────── */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* ── Global btn aliases (used in old code) ───────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: var(--font-body);
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: all var(--transition);
+}
+
+.btn-primary {
+  background: var(--hospital-primary);
+  color: var(--text-inverse);
+  border-color: var(--hospital-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+  background: var(--hospital-primary-dark);
+  border-color: var(--hospital-primary-dark);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.btn-outline:hover {
+  background: var(--surface-hover);
+  border-color: var(--text-primary);
+}
+
+.btn-danger {
+  background: var(--color-error);
+  color: var(--text-inverse);
+  border-color: var(--color-error);
+}
+
+.btn-danger:hover {
+  background: var(--color-critical);
+}

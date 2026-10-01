@@ -1,0 +1,187 @@
+/* ============================================================
+   DietCare HIS — Responsive System
+   Mobile-first breakpoints for enterprise hospital workflows.
+   ============================================================ */
+
+/* ── Sidebar show/hide breakpoints ──────────────────────────── */
+
+@media (max-width: 1023px) {
+  .app-sidebar-desktop {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-sidebar-mobile,
+  .nav-drawer-backdrop {
+    display: none !important;
+  }
+}
+
+/* ── Main content padding on mobile ─────────────────────────── */
+
+@media (max-width: 768px) {
+  main#print-area {
+    padding: var(--space-3) !important;
+  }
+
+  .app-header {
+    padding: 0 var(--space-2) 0 var(--space-3);
+  }
+
+  /* Ensure touch targets are adequate */
+  .hospital-button,
+  .btn,
+  .icon-btn {
+    min-height: var(--touch-min);
+  }
+
+  /* Single-column filter panels */
+  .hospital-filter-panel {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  /* Stack page header actions below title */
+  .hospital-page-header {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .hospital-page-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Full-width stat cards on mobile */
+  .stats-grid-2,
+  .stats-grid-3,
+  .stats-grid-4 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  main#print-area {
+    padding: var(--space-2) !important;
+  }
+
+  .hospital-page {
+    padding: var(--space-2);
+  }
+
+  .stats-grid-2,
+  .stats-grid-3,
+  .stats-grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-form {
+    padding: var(--space-5) var(--space-4);
+  }
+}
+
+/* ── Responsive grid helpers ─────────────────────────────────── */
+
+.stats-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+}
+
+.stats-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+.stats-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 1280px) {
+  .stats-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .stats-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stats-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .stats-grid-2,
+  .stats-grid-3,
+  .stats-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Scrollable tables on narrow screens ─────────────────────── */
+
+.hospital-table-wrap {
+  max-height: min(70vh, 720px);
+}
+
+@media (max-width: 768px) {
+  .hospital-table-wrap {
+    max-height: none;
+  }
+}
+
+/* ── Modal sizing on mobile ──────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: var(--space-2);
+    align-items: flex-end;
+  }
+
+  .modal-overlay [role="dialog"] {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    max-height: 92vh;
+  }
+}
+
+/* ── Tablet optimizations ────────────────────────────────────── */
+
+@media (min-width: 769px) and (max-width: 1023px) {
+  .hospital-page {
+    padding: var(--space-4);
+  }
+
+  .stats-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Large screens ───────────────────────────────────────────── */
+
+@media (min-width: 1440px) {
+  .hospital-page {
+    padding: var(--space-6);
+  }
+}
+
+/* ── Print visibility utilities ──────────────────────────────── */
+
+.print-only {
+  display: none !important;
+}
+
+@media print {
+  .print-hide {
+    display: none !important;
+  }
+  .print-only {
+    display: initial !important;
+  }
+}

@@ -1,0 +1,290 @@
+
+/* Master/Report visual alignment for Diet Plans and Clinical Alerts.
+   Visual treatment only: no dimensions, spacing, typography sizing,
+   layout, routes, data, or functionality changes. */
+
+.diet-plans-page .bg-gradient-to-r,
+.clinical-alerts-page .bg-gradient-to-r,
+.diet-plans-page .bg-gradient-to-br,
+.clinical-alerts-page .bg-gradient-to-br {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  border-color: #9ca3af !important;
+}
+
+.diet-plans-page .text-white,
+.clinical-alerts-page .text-white {
+  color: #111827 !important;
+}
+
+.diet-plans-page .text-emerald-50,
+.diet-plans-page .text-emerald-100,
+.clinical-alerts-page .text-amber-50,
+.clinical-alerts-page .text-amber-100 {
+  color: #6b7280 !important;
+}
+
+.diet-plans-page .bg-emerald-700,
+.diet-plans-page .bg-emerald-600 {
+  background-color: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+}
+
+.diet-plans-page .hover\:bg-emerald-800:hover,
+.diet-plans-page .hover\:bg-emerald-700:hover {
+  background-color: #1e40af !important;
+}
+
+.diet-plans-page .bg-emerald-50,
+.clinical-alerts-page .bg-amber-50 {
+  background-color: #eff6ff !important;
+}
+
+.diet-plans-page .border-emerald-100,
+.diet-plans-page .border-emerald-200,
+.clinical-alerts-page .border-amber-100,
+.clinical-alerts-page .border-amber-200 {
+  border-color: #d1d5db !important;
+}
+
+.diet-plans-page .text-emerald-700,
+.diet-plans-page .text-emerald-800,
+.clinical-alerts-page .text-amber-700,
+.clinical-alerts-page .text-amber-800 {
+  color: #1d4ed8 !important;
+}
+
+.diet-plans-page .shadow-sm,
+.clinical-alerts-page .shadow-sm {
+  box-shadow: 0 1px 3px rgba(15,23,42,.06) !important;
+}
+
+.diet-plans-page .rounded-xl,
+.clinical-alerts-page .rounded-xl {
+  border-color: #9ca3af;
+}
+
+.diet-plans-page table thead,
+.clinical-alerts-page table thead {
+  background-color: #f3f4f6 !important;
+}
+
+.diet-plans-page table th,
+.clinical-alerts-page table th {
+  color: #475569 !important;
+  border-color: #9ca3af !important;
+}
+
+.diet-plans-page table td,
+.clinical-alerts-page table td {
+  border-color: #d1d5db !important;
+}
+
+/* ============================================================
+   Master Page Design System Overrides
+   Converts hardcoded Tailwind utility colors to CSS variables.
+   Applied globally so large files do not need per-line edits.
+   ============================================================ */
+
+/* ── Table rows / cells ─────────────────────────────────────── */
+[data-theme="dark"] table tbody tr td .font-semibold.text-gray-900,
+[data-theme="dark"] table tbody tr td .font-medium.text-gray-900,
+[data-theme="dark"] table .font-semibold.text-gray-900 {
+  color: var(--text-primary) !important;
+}
+
+/* ── All bg-white cards/panels inside main content ─────────── */
+[data-theme="dark"] main .rounded-lg.border.bg-white,
+[data-theme="dark"] main .rounded-md.border.bg-white,
+[data-theme="dark"] main .overflow-x-auto.rounded-lg.border {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── bg-gray-50 sections ───────────────────────────────────── */
+[data-theme="dark"] main .rounded-md.bg-gray-50,
+[data-theme="dark"] main .rounded-lg.bg-gray-50,
+[data-theme="dark"] main .bg-gray-50.p-3,
+[data-theme="dark"] main .rounded-md.border.bg-gray-50 {
+  background: var(--bg-secondary) !important;
+}
+
+/* ── bg-slate-50 info boxes ────────────────────────────────── */
+[data-theme="dark"] main .rounded-md.bg-slate-50,
+[data-theme="dark"] main .rounded-lg.bg-slate-50 {
+  background: var(--color-info-soft) !important;
+  color: var(--color-info) !important;
+}
+
+/* ── Inline border in diet template table rows ─────────────── */
+[data-theme="dark"] table.w-full.text-left.text-sm tbody tr.border-t {
+  border-top-color: var(--border) !important;
+}
+
+/* ── Food item cards ─────────────────────────────────────────  */
+[data-theme="dark"] .flex.items-center.gap-2.rounded.border.bg-white {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Meal section borders ───────────────────────────────────── */
+[data-theme="dark"] section.border-b {
+  border-bottom-color: var(--border) !important;
+}
+
+/* ── DietTemplateTab toolbar / search ──────────────────────── */
+[data-theme="dark"] .rounded-md.border.px-3.py-2.text-sm.hover\:bg-gray-50 {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .w-64.rounded-md.border {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Button classes still used in DietTemplateTab ───────────── */
+[data-theme="dark"] .rounded-md.border.px-3.py-2.text-sm,
+[data-theme="dark"] .rounded-md.bg-blue-700,
+[data-theme="dark"] .inline-flex.items-center.gap-1.rounded-md.bg-blue-700,
+[data-theme="dark"] .inline-flex.items-center.gap-1.rounded.border {
+  /* Let the hospital-button classes take over; just ensure no white bg */
+  background-color: var(--surface) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+/* Override: primary action buttons keep primary color */
+[data-theme="dark"] .inline-flex.items-center.gap-1.rounded-md.bg-blue-700,
+[data-theme="dark"] .rounded-md.bg-blue-700 {
+  background-color: var(--hospital-primary) !important;
+  color: #fff !important;
+  border-color: var(--hospital-primary) !important;
+}
+
+/* ── Meal template box ──────────────────────────────────────── */
+[data-theme="dark"] .rounded-md.border.bg-white.px-3.py-2 {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Empty draft state ──────────────────────────────────────── */
+[data-theme="dark"] .rounded.border.border-dashed {
+  border-color: var(--border) !important;
+  color: var(--text-secondary) !important;
+}
+
+/* ── Select / input inside diet template editor ────────────── */
+[data-theme="dark"] .w-40.rounded.border,
+[data-theme="dark"] .w-44.rounded.border,
+[data-theme="dark"] .w-20.rounded.border {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── KitchenOperations and MealDistribution: bg-white cards ── */
+[data-theme="dark"] .overflow-hidden.rounded-xl.border.border-slate-200.bg-white,
+[data-theme="dark"] .rounded-xl.border.border-slate-200.bg-white,
+[data-theme="dark"] .rounded-xl.border.bg-white.p-5,
+[data-theme="dark"] .rounded-xl.border.bg-white.p-4 {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .rounded-xl.border.border-slate-200.bg-white.shadow-sm {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── bg-slate-50 mini stat boxes ────────────────────────────── */
+[data-theme="dark"] .rounded-lg.bg-slate-50,
+[data-theme="dark"] .rounded-lg.bg-amber-50,
+[data-theme="dark"] .rounded-lg.bg-blue-50,
+[data-theme="dark"] .rounded-lg.bg-violet-50,
+[data-theme="dark"] .rounded-lg.bg-emerald-50 {
+  background: var(--surface-hover) !important;
+}
+
+/* ── border-slate-100, border-slate-200 ────────────────────── */
+[data-theme="dark"] .border-slate-100,
+[data-theme="dark"] .border-slate-200,
+[data-theme="dark"] .border-b.border-slate-100,
+[data-theme="dark"] .border-b.border-slate-200 {
+  border-color: var(--border) !important;
+}
+
+/* ── bg-slate-50 toolbar areas ──────────────────────────────── */
+[data-theme="dark"] .grid.grid-cols-4.border-t.bg-slate-50,
+[data-theme="dark"] .shrink-0.grid.grid-cols-3.border-t.bg-slate-50 {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── table thead bg-slate-50 ────────────────────────────────── */
+[data-theme="dark"] .w-full.text-left.text-xs thead.bg-slate-50,
+[data-theme="dark"] thead.bg-slate-50,
+[data-theme="dark"] thead.sticky.bg-slate-50 {
+  background: var(--bg-secondary) !important;
+}
+
+/* ── Sticky table headers ───────────────────────────────────── */
+[data-theme="dark"] .sticky.top-0.z-10.bg-slate-50 {
+  background: var(--bg-secondary) !important;
+}
+
+/* ── Report page bg-white panels ───────────────────────────── */
+[data-theme="dark"] .bg-white.rounded-xl.shadow-sm.border.p-4,
+[data-theme="dark"] .report-list-panel {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Settings sections ──────────────────────────────────────── */
+[data-theme="dark"] .settings-section {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Notif dropdown / header menu still using bg-white ──────── */
+[data-theme="dark"] .absolute.right-0.top-12.w-80,
+[data-theme="dark"] .absolute.right-0.top-12.w-44 {
+  background: var(--surface-overlay) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Sidebar bottom popup bg-white ─────────────────────────── */
+[data-theme="dark"] .absolute.left-full.z-30.w-44 {
+  background: var(--surface-overlay) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Dividers ───────────────────────────────────────────────── */
+[data-theme="dark"] .divide-y > * + * {
+  border-color: var(--border) !important;
+}
+
+/* ── text colors (light mode already correct, dark needs fix) ── */
+[data-theme="dark"] .text-slate-900 { color: var(--text-primary) !important; }
+[data-theme="dark"] .text-slate-800 { color: var(--text-primary) !important; }
+[data-theme="dark"] .text-slate-700 { color: var(--text-secondary) !important; }
+[data-theme="dark"] .text-slate-600 { color: var(--text-secondary) !important; }
+[data-theme="dark"] .text-slate-500 { color: var(--text-secondary) !important; }
+[data-theme="dark"] .text-slate-400 { color: var(--text-disabled) !important; }
+
+/* Kitchen summary mini-tabs */
+[data-theme="dark"] .min-w-0.rounded-lg.border.px-2.py-1\.5.text-left,
+[data-theme="dark"] .min-w-0.rounded-lg.border.px-2.py-1 {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .border-emerald-300.bg-emerald-50\/70 {
+  background: color-mix(in srgb, var(--hospital-primary) 14%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--hospital-primary) 40%, var(--border)) !important;
+}

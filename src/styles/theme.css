@@ -1,0 +1,398 @@
+/* ============================================================
+   DietCare HIS — App Shell Theme (Enterprise V2)
+   Layout-level classes: shell, header, sidebar, brand.
+   All values reference CSS variables from tokens.css.
+   ============================================================ */
+
+/* ── App Shell ───────────────────────────────────────────────── */
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+
+.app-header {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+  background: var(--color-header-hex, var(--surface));
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  color: var(--text-primary);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  flex-shrink: 0;
+}
+
+.app-header-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  flex: 1;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* Brand pill */
+.app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--hospital-primary);
+  color: var(--text-inverse);
+  font-size: var(--font-label);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.app-brand-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Page title area */
+.app-page-label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.app-page-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.app-page-subtitle {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Header search trigger */
+.app-search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: var(--font-body);
+  cursor: pointer;
+  transition: all var(--transition);
+  width: 240px;
+  justify-content: space-between;
+}
+
+.app-search-trigger:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.app-search-trigger > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Icon buttons in header */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.icon-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.icon-btn:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+/* User avatar */
+.app-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--hospital-primary-light), var(--hospital-primary));
+  color: var(--text-inverse);
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+/* Dropdown menus from header */
+.app-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  z-index: var(--z-overlay);
+}
+
+.app-dropdown-header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.app-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.app-dropdown-item:hover {
+  background: var(--surface-hover);
+}
+
+.app-dropdown-item.danger {
+  color: var(--color-error);
+}
+
+.app-dropdown-item.danger:hover {
+  background: var(--color-error-soft);
+}
+
+/* Notification dot */
+.notif-dot {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-error);
+  border: 2px solid var(--surface);
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+
+.bg-sidebar {
+  /* Using a dark, highly professional sidebar background */
+  background: var(--color-sidebar-hex, #0a1118);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.text-sidebar-foreground {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.border-sidebar-border {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.bg-sidebar-primary {
+  background: var(--hospital-primary);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.bg-sidebar-accent:hover,
+.hover\:bg-sidebar-accent:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.text-sidebar-primary {
+  color: var(--hospital-primary-light);
+}
+
+/* Sidebar group label */
+.sidebar-group-label {
+  width: 100%;
+  margin: var(--space-4) 0 var(--space-2);
+  padding: 0 var(--space-3);
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Active nav link */
+.nav-link-active {
+  background: var(--hospital-primary) !important;
+  color: var(--text-inverse) !important;
+}
+
+/* ── App Boot Splash ─────────────────────────────────────────── */
+
+.app-boot {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.app-boot-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.app-boot-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--hospital-primary-light), var(--hospital-primary));
+  color: var(--text-inverse);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 1.75rem;
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Skip Link ───────────────────────────────────────────────── */
+
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: -48px;
+  z-index: 200;
+  padding: var(--space-2) var(--space-4);
+  background: var(--hospital-primary);
+  color: var(--text-inverse);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-body);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-md);
+}
+
+.skip-link:focus {
+  top: var(--space-4);
+}
+
+/* ── Backdrop for mobile nav ─────────────────────────────────── */
+
+.nav-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-sidebar) - 1);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+/* ── Keyboard shortcut badge ─────────────────────────────────── */
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: ui-monospace, monospace;
+}
+
+/* ── Compact UI density adjustments ─────────────────────────── */
+
+.compact-ui main {
+  font-size: 0.9rem;
+}
+
+/* ── Animations ──────────────────────────────────────────────── */
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 150ms ease-out forwards;
+}
+
+.animate-slide-in {
+  animation: slide-in-left 200ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ── Dark mode fixes ─────────────────────────────────────────── */
+[data-theme="dark"] .app-header {
+  background: var(--color-header-hex, var(--surface));
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .sidebar-popup,
+[data-theme="dark"] .app-dropdown {
+  background: var(--surface-overlay);
+  border-color: var(--border);
+  color: var(--text-primary);
+}

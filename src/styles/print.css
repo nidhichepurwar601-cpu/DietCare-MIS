@@ -1,0 +1,43 @@
+@media print {
+  :root,
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+    box-shadow: none !important;
+  }
+
+  .print-hide,
+  .app-header,
+  aside,
+  .nav-drawer-backdrop,
+  .command-palette-overlay,
+  .icon-btn,
+  .skip-link {
+    display: none !important;
+  }
+
+  main#print-area {
+    overflow: visible !important;
+    height: auto !important;
+    background: #fff !important;
+    color: #111 !important;
+    padding: 0 !important;
+  }
+
+  .hospital-page-header {
+    background: #fff !important;
+    color: #111 !important;
+    border: 1px solid #d0d5d8 !important;
+    box-shadow: none !important;
+  }
+
+  .hospital-page-eyebrow,
+  .hospital-page-description {
+    color: #44545c !important;
+  }
+
+  a[href]::after {
+    content: none !important;
+  }
+}

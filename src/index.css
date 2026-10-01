@@ -1,0 +1,227 @@
+/* ============================================================
+   DietCare HIS — Global Base + Tailwind
+   Token overrides and dark mode corrections.
+   ============================================================ */
+
+@import "tailwindcss";
+
+/* ── Tailwind theme bridge to CSS custom properties ──────────── */
+@theme inline {
+  --color-background:         hsl(var(--background));
+  --color-foreground:         hsl(var(--foreground));
+  --color-card:               hsl(var(--card));
+  --color-border:             hsl(var(--border-tw));
+  --color-primary:            hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary:          hsl(var(--secondary));
+  --color-muted:              hsl(var(--muted));
+  --color-muted-foreground:   hsl(var(--muted-foreground));
+  --color-accent:             hsl(var(--accent));
+  --color-destructive:        hsl(var(--destructive));
+  --color-sidebar:            hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-border:     hsl(var(--sidebar-border));
+  --color-sidebar-primary:    hsl(var(--sidebar-primary));
+  --color-sidebar-accent:     hsl(var(--sidebar-accent));
+  --color-white:              #ffffff;
+  --font-sans:                "Inter", sans-serif;
+}
+
+/* ── Tailwind HSL variable bridge ────────────────────────────── */
+:root {
+  --background:          0 0% 97%;
+  --foreground:          222 47% 11%;
+  --card:                0 0% 100%;
+  --border-tw:           214 32% 91%;
+  --primary:             174 81% 26%;    /* teal-700 */
+  --primary-foreground:  0 0% 100%;
+  --secondary:           214 32% 91%;
+  --muted:               220 14% 96%;
+  --muted-foreground:    220 9% 46%;
+  --accent:              173 80% 26%;
+  --destructive:         0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --sidebar:             200 52% 13%;
+  --sidebar-foreground:  0 0% 95%;
+  --sidebar-border:      200 40% 20%;
+  --sidebar-primary:     174 81% 33%;
+  --sidebar-accent:      200 40% 22%;
+}
+
+:root[data-theme="dark"] {
+  --background:          215 12% 7%;
+  --foreground:          210 16% 92%;
+  --card:                215 14% 12%;
+  --border-tw:           215 12% 18%;
+  --primary:             174 60% 45%;
+  --primary-foreground:  0 0% 100%;
+  --secondary:           215 12% 16%;
+  --muted:               215 12% 14%;
+  --muted-foreground:    215 10% 65%;
+  --accent:              215 12% 10%;
+  --destructive:         0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --sidebar:             210 12% 8%;
+  --sidebar-foreground:  0 0% 92%;
+  --sidebar-border:      210 12% 14%;
+  --sidebar-primary:     174 60% 50%;
+  --sidebar-accent:      174 40% 25%;
+}
+
+/* ── Base layer ──────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 12px;
+  }
+
+  body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Compact mode density */
+  .compact-ui {
+    font-size: 0.93rem;
+  }
+
+  /* Tables */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  table th,
+  table td {
+    padding: 0.6rem 0.8rem;
+    vertical-align: middle;
+  }
+
+  /* Global button base */
+  button {
+    font-family: inherit;
+  }
+}
+
+/* ── Modal overlay position fix ──────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+/* ── Table panel (DataTable host) ────────────────────────────── */
+
+.table-panel {
+  background: var(--surface);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  min-width: 0;
+  transition: box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Dark mode targeted fixes ────────────────────────────────── */
+/* Only fix specific components that still use Tailwind bg-white */
+
+[data-theme="dark"] .bg-white {
+  background-color: var(--surface) !important;
+}
+
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-slate-50 {
+  background-color: var(--bg-secondary) !important;
+}
+
+[data-theme="dark"] .bg-gray-100,
+[data-theme="dark"] .bg-slate-100 {
+  background-color: var(--surface-hover) !important;
+}
+
+[data-theme="dark"] .text-gray-900,
+[data-theme="dark"] .text-slate-900 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .text-gray-800,
+[data-theme="dark"] .text-slate-800 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .text-gray-700,
+[data-theme="dark"] .text-slate-700 {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .border,
+[data-theme="dark"] .border-gray-200,
+[data-theme="dark"] .border-gray-300,
+[data-theme="dark"] .border-slate-200 {
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .divide-y > :not(:first-child) {
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] input:not([type="color"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .hover\:bg-gray-50:hover,
+[data-theme="dark"] .hover\:bg-slate-50:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+/* ── Print ───────────────────────────────────────────────────── */
+
+/* PRINT REPORT: the print view contains only the complete report list. */
+.report-print-table { display: none; }
+
+@media print {
+  html.only-print-report body * { visibility: hidden !important; }
+  html.only-print-report .report-list-panel,
+  html.only-print-report .report-list-panel * { visibility: visible !important; }
+  html.only-print-report .report-screen-table,
+  html.only-print-report .report-filters,
+  html.only-print-report .report-controls { display: none !important; }
+  html.only-print-report .report-print-table {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+  }
+  html.only-print-report .report-list-panel {
+    position: static !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  html.only-print-report .report-print-table table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  html.only-print-report .report-print-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page { size: A4 portrait; margin: 12mm; }
+}
