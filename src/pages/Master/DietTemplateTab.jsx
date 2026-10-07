@@ -32,6 +32,7 @@ import dietTemplateService from "../../services/dietTemplateService.js";
 import templateItemService from "../../services/templateItemService.js";
 import foodService from "../../services/foodService.js";
 import foodNutritionService from "../../services/foodNutritionService.js";
+import { loadTemplateMappings } from "../../lib/masterData.js";
 
 const MEAL_NAMES = [
   "Breakfast",
@@ -1653,6 +1654,49 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
   const [selectedFood, setSelectedFood] = useState({});
   const [selectedMealType, setSelectedMealType] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loadingTemplateItems, setLoadingTemplateItems] = useState(
+    !isNewTemplate,
+  );
+  const [templateItemLoadError, setTemplateItemLoadError] = useState("");
+
+  useEffect(() => {
+    if (isNewTemplate) return undefined;
+    let active = true;
+    const templateId = normalized.templateId ?? normalized.id;
+    loadTemplateMappings(templateId, normalized.dietTypeId)
+      .then((templateRows) => {
+        if (!active) return;
+        const existingMappings = getStore(KEYS.DIET_MAPPING, []) || [];
+        const otherMappings = existingMappings.filter(
+          (mapping) =>
+            Number(mapping.dietTemplateId) !== Number(templateId),
+        );
+        setDraft(
+          buildDraft(
+            templateId,
+            normalized.dietTypeId,
+            [...otherMappings, ...templateRows],
+            mealTypes,
+            foods,
+          ),
+        );
+        setTemplateItemLoadError("");
+      })
+      .catch((error) => {
+        if (active) {
+          setTemplateItemLoadError(
+            error?.message || "Unable to load this template's existing items.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingTemplateItems(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isNewTemplate, normalized.templateId, normalized.id, normalized.dietTypeId]);
 
   const totals = useMemo(
     () =>
@@ -1776,6 +1820,7 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
 
   const submit = async () => {
     console.log("---", form);
+    if (loadingTemplateItems || templateItemLoadError) return;
 
     /*     if (!form.name.trim() || !form.code.trim()) {
       alert("Diet Template Name and Code are required.");
@@ -1828,16 +1873,29 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
             <button
               type="button"
               onClick={submit}
-              disabled={saving}
+              disabled={saving || loadingTemplateItems || Boolean(templateItemLoadError)}
               className="hospital-button"
             >
-              <Save size={15} /> {saving ? "Saving..." : "Save Template"}
+              <Save size={15} />{" "}
+              {saving
+                ? "Saving..."
+                : loadingTemplateItems
+                  ? "Loading items..."
+                  : "Save Template"}
             </button>
           </div>
         </div>
       }
     >
       <div className="space-y-3">
+        {templateItemLoadError && (
+          <div
+            role="alert"
+            className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+          >
+            {templateItemLoadError}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2 border-b pb-3 md:grid-cols-3 xl:grid-cols-6">
           <div>
             <label className="hospital-label">

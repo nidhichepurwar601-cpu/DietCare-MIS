@@ -166,6 +166,19 @@ function App() {
   useEffect(() => {
     let active = true;
     const initialize = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get("token");
+      const userId = urlParams.get("userId");
+      const clinicId = urlParams.get("clinicId");
+      const zoneId = urlParams.get("zoneId");
+      if (token) sessionStorage.setItem("AUTHTOKEN", token);
+      if (userId) sessionStorage.setItem("UserId", userId);
+      if (clinicId) sessionStorage.setItem("ClinicId", clinicId);
+      if (zoneId) sessionStorage.setItem("ZONEID", zoneId);
+      if (token || userId || clinicId || zoneId) {
+                const cleanPath = window.location.pathname.replace(/^\/+/, '/') || '/';
+        window.history.replaceState({}, document.title, cleanPath);
+      }
       clearLegacyAppStorage();
       ensureDevAdminSession();
 
@@ -220,7 +233,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      {startupError && (
+      {/* {startupError && (
         <div
           role="alert"
           style={{
@@ -233,7 +246,7 @@ function App() {
         >
           {startupError}
         </div>
-      )}
+      )} */}
       <Suspense
         fallback={
           <div className="app-boot">

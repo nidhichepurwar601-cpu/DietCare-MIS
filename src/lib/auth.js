@@ -135,6 +135,9 @@ export function resetPassword(email, newPassword) {
 export function signOut() {
   localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_KEY);
+  ["AUTHTOKEN", "UserId", "ClinicId", "ZONEID"].forEach((key) =>
+    sessionStorage.removeItem(key),
+  );
   window.dispatchEvent(new CustomEvent("auth-updated"));
 }
 

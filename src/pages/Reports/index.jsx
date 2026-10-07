@@ -65,7 +65,7 @@ function SummaryCard({ title, value, icon: Icon, color }) {
   const c = palette[color] ?? palette.blue;
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm border p-4 border-l-4 ${c.border} flex items-center justify-between`}
+      className={`reports-summary-card bg-white rounded-xl shadow-sm border p-4 border-l-4 ${c.border} flex items-center justify-between`}
     >
       <div>
         <p className="text-xs text-gray-500">{title}</p>
@@ -165,7 +165,7 @@ function ReportSummaryCards({ data, type }) {
 /* ── ReportFilters ──────────────────────────────────────────────── */
 function ReportFilters({ filters, onChange, onGenerate, onClear, dietTypes }) {
   return (
-    <div className="hospital-filter-panel">
+    <div className="hospital-filter-panel reports-filter-panel">
       <div className="hospital-field" style={{ flex: "1 1 160px" }}>
         <label className="hospital-label">Report Type</label>
         <select className="hospital-select" value={filters.reportType} onChange={(e) => onChange("reportType", e.target.value)}>
@@ -195,7 +195,7 @@ function ReportFilters({ filters, onChange, onGenerate, onClear, dietTypes }) {
         </select>
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-2)", flexShrink: 0 }}>
-        <button onClick={onGenerate} className="hospital-button">Search</button>
+        <button type="button" onClick={onGenerate} className="hospital-button">Search</button>
         <button type="button" onClick={onClear} className="hospital-button hospital-button-secondary">Clear</button>
       </div>
     </div>
@@ -298,7 +298,7 @@ function ReportTable({ data, type }) {
 
   return (
     <>
-      <div className="report-screen-table">
+      <div className="report-screen-table reports-table">
         <DataTable
           columns={columns}
           data={data}
@@ -697,30 +697,32 @@ export default function Reports() {
   };
 
   return (
-    <AppLayout>
+    <AppLayout title="Reports & Analytics">
       <HospitalPage
         title={filters.reportType}
         description="Manage and export report data in a single view."
-        noPadding={true}
+        className="reports-page"
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", maxWidth: 1400, padding: "var(--space-4)" }}>
+        <div className="reports-content">
           <div className="report-filters">
             <ReportFilters filters={filters} onChange={(k, v) => setFilters((p) => ({ ...p, [k]: v }))} onGenerate={generate} onClear={clearFilters} dietTypes={dietTypes} />
           </div>
 
-          <ReportSummaryCards data={reportData} type={filters.reportType} />
+          <div className="reports-summary">
+            <ReportSummaryCards data={reportData} type={filters.reportType} />
+          </div>
 
-          <div className="report-controls" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
-            <span style={{ fontSize: "var(--font-body)", fontWeight: 700, color: "var(--text-primary)" }}>
+          <div className="report-controls">
+            <span className="reports-count">
               Found {reportData.length} {reportData.length === 1 ? "record" : "records"}
             </span>
-            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <div className="reports-actions">
               <button onClick={exportCSV} className="hospital-button hospital-button-secondary hospital-button-sm">Export CSV</button>
               <button onClick={printReport} className="hospital-button hospital-button-sm">Print</button>
             </div>
           </div>
 
-          <div className="report-list-panel hospital-card" style={{ marginBottom: 0 }}>
+          <div className="report-list-panel hospital-card">
             {!screenReady ? (
               <div className="page-loading">
                 <div className="app-boot-spinner" />
@@ -734,7 +736,7 @@ export default function Reports() {
                 </div>
               </div>
             ) : !reportData.length ? (
-              <div className="hospital-empty">
+              <div className="hospital-empty reports-empty">
                 <div className="hospital-empty-icon">
                   <Filter size={22} />
                 </div>

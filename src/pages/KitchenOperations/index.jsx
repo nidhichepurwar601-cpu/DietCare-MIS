@@ -1491,13 +1491,13 @@ export default function KitchenOperations() {
     <HospitalPage
       title="Kitchen Operations"
       description="Manage and track food preparation for all scheduled meals."
-      noPadding={true}
+      className="kitchen-operations-page"
     >
-      <div className="h-full min-h-0 p-4">
-        <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="kitchen-dashboard-content">
+        <div className="kitchen-dashboard-stack">
           {/* Compact dashboard-style kitchen overview */}
-          <section className="shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="grid grid-cols-[150px_minmax(135px,1fr)_repeat(7,minmax(90px,1fr))] gap-2 p-2">
+          <section className="kitchen-summary-card shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="kitchen-summary-grid grid gap-3 p-4">
               <label className="rounded-lg bg-white px-2 py-1 text-[10px] font-semibold text-slate-600">
                 Preparation Date
                 <div className="mt-1 flex h-8 items-center gap-1.5 rounded-lg border border-slate-300 px-2 text-xs font-normal text-slate-800">
@@ -1628,7 +1628,7 @@ export default function KitchenOperations() {
           </section>
 
           {/* Dashboard-style meal distribution + current kitchen action */}
-          <section className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <section className="kitchen-meal-card shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
@@ -1705,7 +1705,7 @@ export default function KitchenOperations() {
               </div>
             </div>
 
-            <div className="grid grid-cols-7 gap-2">
+            <div className="kitchen-meal-grid grid grid-cols-7 gap-3">
               {MEALS.map((meal) => {
                 const planned = preparationMealCounts[meal] || 0;
                 const packed = preparedMealsFor(meal);
@@ -1754,9 +1754,9 @@ export default function KitchenOperations() {
           </section>
 
           {/* Actual kitchen work stays here; only the presentation is dashboard-like. */}
-          <section className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="shrink-0 border-b px-3 py-2">
+          <section className="kitchen-preparation-card overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col">
+              <div className="shrink-0 border-b px-5 py-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="text-sm font-bold text-slate-900">
@@ -1826,9 +1826,9 @@ export default function KitchenOperations() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 z-10 bg-slate-50 text-[10px] text-slate-500">
+              <div className="hospital-table-wrap kitchen-preparation-table-wrap">
+                <table className="kitchen-preparation-table text-left">
+                  <thead className="sticky top-0 z-10 bg-slate-50">
                     <tr>
                       <th className="px-3 py-2">#</th>
                       <th className="px-3 py-2">Food Item</th>

@@ -4,9 +4,10 @@ import dietTemplateService from "../services/dietTemplateService.js";
 import mealTypeService from "../services/mealTypeService.js";
 import foodService from "../services/foodService.js";
 import templateItemService from "../services/templateItemService.js";
+import { getApiCacheGeneration } from "../services/apiClient.js";
 import { normalizePatientApiRow } from "../services/patientAdapter.js";
 import { normalizeDietType } from "./dietTypeAdapter.js";
-import { getStore, KEYS, normalizeUnit } from "./storage.js";
+import { getStore, KEYS, normalizeUnit, setStore } from "./storage.js";
 
 const LIST_PAGE = {
   currentPage: 1,
@@ -18,6 +19,9 @@ const LIST_PAGE = {
 };
 const TEMPLATE_ITEM_CACHE_MS = 10000;
 const templateItemReadCache = new Map();
+const MASTER_DATA_CACHE_MS = 30000;
+let masterDataCache = null;
+let pendingMasterData = null;
 
 export function extractRows(response, predicate = () => true) {
   const candidates = [];
@@ -114,66 +118,103 @@ function readTemplateItems(templateId) {
   return promise;
 }
 
-async function loadMappings(templates) {
-  const mappingWarnings = [];
-  const itemLists = await Promise.all(
-    templates.map(async (template) => {
-      const embedded = inlineItems(template);
-      if (Array.isArray(embedded) && embedded.length) {
-        return embedded.filter((row) => row && isItemRow(row));
+function mapTemplateItems(template, rows) {
+  const byMeal = new Map();
+  rows.forEach((row) => {
+    const mealTypeId = Number(row.mealTypeId ?? row.meal_type_id);
+    const foodId = Number(row.foodId ?? row.food_id);
+    if (!Number.isFinite(mealTypeId) || !Number.isFinite(foodId)) return;
+    const mapping = byMeal.get(mealTypeId) || {
+      dietTemplateId: Number(template.templateId),
+      dietTypeId: Number(template.dietTypeId) || null,
+      mealTypeId,
+      foodItems: [],
+      quantities: {},
+      quantityTexts: {},
+      units: {},
+      status: true,
+    };
+    if (!mapping.foodItems.includes(foodId)) mapping.foodItems.push(foodId);
+    const quantity = row.amount ?? row.quantity;
+    if (quantity != null && quantity !== "") {
+      const numericQuantity = Number(quantity);
+      if (Number.isFinite(numericQuantity)) {
+        mapping.quantities[foodId] = numericQuantity;
       }
-      const result = await readTemplateItems(template.templateId);
-      if (result.error) {
-        const error = result.error;
-        mappingWarnings.push({
-          templateId: template.templateId,
-          status: error?.status ?? null,
-        });
-        console.error(
-          `Could not load meal items for diet template ${template.templateId}.`,
-          error,
-        );
-        return [];
-      }
-      return result.rows;
-    }),
-  );
-
-  const mappings = templates.flatMap((template, index) => {
-    const byMeal = new Map();
-    itemLists[index].forEach((row) => {
-      const mealTypeId = Number(row.mealTypeId ?? row.meal_type_id);
-      const foodId = Number(row.foodId ?? row.food_id);
-      if (!Number.isFinite(mealTypeId) || !Number.isFinite(foodId)) return;
-      const mapping = byMeal.get(mealTypeId) || {
-        dietTemplateId: Number(template.templateId),
-        dietTypeId: Number(template.dietTypeId) || null,
-        mealTypeId,
-        foodItems: [],
-        quantities: {},
-        quantityTexts: {},
-        units: {},
-        status: true,
-      };
-      if (!mapping.foodItems.includes(foodId)) mapping.foodItems.push(foodId);
-      const quantity = row.amount ?? row.quantity;
-      if (quantity != null && quantity !== "") {
-        const numericQuantity = Number(quantity);
-        if (Number.isFinite(numericQuantity)) {
-          mapping.quantities[foodId] = numericQuantity;
-        }
-        mapping.quantityTexts[foodId] = String(quantity);
-      }
-      const unit = normalizeUnit(row.unit);
-      if (unit) mapping.units[foodId] = unit;
-      byMeal.set(mealTypeId, mapping);
-    });
-    return [...byMeal.values()];
+      mapping.quantityTexts[foodId] = String(quantity);
+    }
+    const unit = normalizeUnit(row.unit);
+    if (unit) mapping.units[foodId] = unit;
+    byMeal.set(mealTypeId, mapping);
   });
+  return [...byMeal.values()];
+}
+
+function loadMappings(templates) {
+  const mappings = [];
+  const mappingWarnings = [];
+
+  for (const template of templates) {
+    const embedded = inlineItems(template);
+    if (Array.isArray(embedded) && embedded.length) {
+      mappings.push(...mapTemplateItems(
+        template,
+        embedded.filter((row) => row && isItemRow(row)),
+      ));
+    }
+  }
+
   return { mappings, mappingWarnings };
 }
 
-export async function loadMasterData() {
+export async function loadTemplateMappings(templateId, dietTypeId = null) {
+  if (templateId == null || templateId === "") return [];
+  const storedTemplate = (getStore(KEYS.DIET_TEMPLATES, []) || []).find(
+    (item) => String(item.templateId ?? item.id) === String(templateId),
+  );
+  const template = {
+    templateId,
+    dietTypeId: dietTypeId ?? storedTemplate?.dietTypeId,
+  };
+  const embedded = inlineItems(storedTemplate || {});
+  if (Array.isArray(embedded) && embedded.length) {
+    const mappings = mapTemplateItems(
+      template,
+      embedded.filter((row) => row && isItemRow(row)),
+    );
+    mergeTemplateMappings(templateId, mappings);
+    return mappings;
+  }
+
+  const result = await readTemplateItems(templateId);
+  if (result.error) {
+    console.error(
+      `Could not load meal items for diet template ${templateId}.`,
+      result.error,
+    );
+    throw result.error;
+  }
+  const mappings = mapTemplateItems(template, result.rows);
+  mergeTemplateMappings(templateId, mappings);
+  return mappings;
+}
+
+function mergeTemplateMappings(templateId, mappings) {
+  const existing = getStore(KEYS.DIET_MAPPING, []) || [];
+  const remaining = existing.filter(
+    (mapping) => String(mapping.dietTemplateId) !== String(templateId),
+  );
+  const mergedMappings = [...remaining, ...mappings];
+  setStore(KEYS.DIET_MAPPING, mergedMappings);
+  if (masterDataCache) {
+    masterDataCache.data = {
+      ...masterDataCache.data,
+      mappings: mergedMappings,
+    };
+  }
+}
+
+async function loadMasterDataFromApi() {
   const [patientResponse, typeResponse, templateResponse, mealResponse, foodResponse] =
     await Promise.all([
       patientService.getAllPatients({
@@ -308,4 +349,37 @@ export async function loadMasterData() {
     mappings,
     mappingWarnings,
   };
+}
+
+export function loadMasterData() {
+  const generation = getApiCacheGeneration();
+  if (
+    masterDataCache &&
+    masterDataCache.generation === generation &&
+    masterDataCache.expiresAt > Date.now()
+  ) {
+    return Promise.resolve(masterDataCache.data);
+  }
+  if (pendingMasterData?.generation === generation) {
+    return pendingMasterData.promise;
+  }
+
+  const promise = loadMasterDataFromApi()
+    .then((data) => {
+      if (getApiCacheGeneration() === generation) {
+        masterDataCache = {
+          data,
+          generation,
+          expiresAt: Date.now() + MASTER_DATA_CACHE_MS,
+        };
+      }
+      return data;
+    })
+    .finally(() => {
+      if (pendingMasterData?.promise === promise) {
+        pendingMasterData = null;
+      }
+    });
+  pendingMasterData = { generation, promise };
+  return promise;
 }

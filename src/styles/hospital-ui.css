@@ -437,6 +437,234 @@
   border-bottom: 0;
 }
 
+/* Kitchen Operations uses the shared dashboard typography and table rhythm. */
+.kitchen-operations-page .kitchen-dashboard-content {
+  line-height: 1.45;
+}
+
+.kitchen-operations-page .hospital-page-header {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--hospital-primary-dark) 84%, white) 0%,
+    color-mix(in srgb, var(--hospital-primary) 86%, white) 100%
+  );
+}
+
+.kitchen-operations-page .kitchen-dashboard-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.kitchen-operations-page .kitchen-summary-grid {
+  grid-template-columns: 170px minmax(150px, 1fr) repeat(
+      7,
+      minmax(110px, 1fr)
+    );
+}
+
+.kitchen-operations-page .kitchen-meal-grid {
+  grid-template-columns: repeat(7, minmax(115px, 1fr));
+}
+
+.kitchen-operations-page .kitchen-dashboard-content [class~="text-[8px]"],
+.kitchen-operations-page .kitchen-dashboard-content [class~="text-[9px]"] {
+  font-size: max(var(--font-caption), 12px);
+}
+
+.kitchen-operations-page .kitchen-dashboard-content [class~="text-[10px]"],
+.kitchen-operations-page .kitchen-dashboard-content [class~="text-[11px]"],
+.kitchen-operations-page .kitchen-dashboard-content .text-xs {
+  font-size: var(--font-body);
+}
+
+.kitchen-operations-page .kitchen-summary-card,
+.kitchen-operations-page .kitchen-meal-card,
+.kitchen-operations-page .kitchen-preparation-card {
+  border-color: var(--hospital-border);
+  border-radius: var(--hospital-radius);
+  background: var(--hospital-card);
+  box-shadow: var(--hospital-shadow);
+}
+
+.kitchen-operations-page .kitchen-preparation-card {
+  min-width: 0;
+}
+
+.kitchen-operations-page .kitchen-preparation-table-wrap {
+  max-height: min(52vh, 520px);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.kitchen-operations-page .kitchen-preparation-table {
+  min-width: 900px;
+}
+
+.kitchen-operations-page .kitchen-preparation-table th {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-raised);
+  border-bottom-color: var(--border);
+}
+
+.kitchen-operations-page .kitchen-preparation-table td {
+  min-height: 48px;
+  border-bottom-color: var(--border);
+}
+
+.kitchen-operations-page .kitchen-preparation-card > div > div,
+.kitchen-operations-page .kitchen-preparation-footer > div,
+.kitchen-operations-page .kitchen-summary-card [class*="border-"],
+.kitchen-operations-page .kitchen-meal-card [class*="border-"] {
+  border-color: var(--border);
+}
+
+.kitchen-operations-page .kitchen-preparation-footer > div {
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-secondary);
+}
+
+.kitchen-operations-page .kitchen-preparation-footer > div:nth-child(2) {
+  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+}
+
+.reports-page .reports-content {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reports-page .reports-filter-panel {
+  width: 100%;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.reports-page .reports-filter-panel .hospital-field {
+  min-width: min(180px, 100%);
+}
+
+.reports-page .reports-summary:empty {
+  display: none;
+}
+
+.reports-page .reports-summary > .grid {
+  gap: var(--space-4);
+}
+
+.reports-page .reports-summary-card {
+  min-height: 96px;
+  border-color: var(--hospital-border);
+  border-left-width: 3px;
+  border-radius: var(--hospital-radius);
+  background: var(--hospital-card);
+  box-shadow: var(--hospital-shadow);
+}
+
+.reports-page .reports-summary-card p:first-child {
+  color: var(--text-secondary);
+  font-size: var(--font-caption);
+  font-weight: 600;
+}
+
+.reports-page .reports-summary-card p:nth-child(2) {
+  color: var(--text-primary);
+}
+
+.reports-page .report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 40px;
+}
+
+.reports-page .reports-count {
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  font-weight: 700;
+}
+
+.reports-page .reports-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.reports-page .report-list-panel {
+  width: 100%;
+  min-height: 220px;
+  margin-bottom: 0;
+  border-color: var(--hospital-border);
+  border-radius: var(--hospital-radius);
+  background: var(--hospital-card);
+  box-shadow: var(--hospital-shadow);
+}
+
+.reports-page .reports-empty {
+  min-height: 220px;
+  justify-content: center;
+}
+
+.reports-page .reports-table .hospital-table-wrap {
+  width: 100%;
+  max-height: min(62vh, 680px);
+}
+
+.reports-page .reports-table table {
+  min-width: 720px;
+}
+
+.reports-page .reports-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--bg-secondary) 35%, transparent);
+}
+
+.reports-page .reports-table tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+@media (max-width: 768px) {
+  .reports-page .reports-filter-panel {
+    align-items: stretch;
+  }
+
+  .reports-page .reports-filter-panel > div:last-child {
+    width: 100%;
+  }
+
+  .reports-page .reports-filter-panel > div:last-child button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 1200px) {
+  .kitchen-operations-page .kitchen-summary-grid {
+    grid-template-columns: repeat(4, minmax(145px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .kitchen-operations-page .kitchen-meal-grid {
+    grid-template-columns: repeat(4, minmax(125px, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .kitchen-operations-page .kitchen-summary-grid,
+  .kitchen-operations-page .kitchen-meal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kitchen-operations-page .kitchen-preparation-table-wrap {
+    max-height: none;
+  }
+}
+
 /* ── Status Badges ───────────────────────────────────────────── */
 
 .hospital-status {

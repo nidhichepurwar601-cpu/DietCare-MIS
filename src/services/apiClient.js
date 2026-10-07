@@ -1,4 +1,9 @@
-import { API_CONFIG, DEFAULT_HEADERS, TIMEOUT_MS } from '../config/api.config';
+import {
+  API_CONFIG,
+  DEFAULT_HEADERS,
+  getSessionAuthHeaders,
+  TIMEOUT_MS,
+} from "../config/api.config";
 import { messageForHttpStatus } from '../lib/apiErrors.js';
 
 /**
@@ -17,6 +22,8 @@ const READ_CACHE_TTL_MS = 10000;
 const readCache = new Map();
 const pendingReads = new Map();
 let cacheGeneration = 0;
+
+export const getApiCacheGeneration = () => cacheGeneration;
 
 const isReadOnlyPost = (endpoint) =>
   /\/(?:patient\/get|diet\/type\/get|diet\/template\/get\/all|diettemplate\/item\/get\/by\/template\/[^/]+|food\/get|mealtype\/get|dietmanager\/get|kitchen\/get|mealdelivery\/get|clinicalalert\/get|notification\/get|dashboard\/get)\/?$/.test(
@@ -58,8 +65,7 @@ async function requestOnce(url, config) {
 /**
  * Standard fetch wrapper with interceptor-like behavior.
  *
- * ✅ Auth headers & timeout come from api.config.js → driven by .env
- *    Do NOT hard-code any credentials here.
+ * API URL is resolved from runtime config; auth headers come from sessionStorage.
  *
  * @param {string} endpoint - Relative API endpoint path
  * @param {RequestInit} options - Standard fetch options
@@ -70,8 +76,9 @@ export async function apiClient(endpoint, { body, ...customConfig } = {}) {
     method: body ? 'POST' : 'GET',
     ...customConfig,
     headers: {
-      ...DEFAULT_HEADERS,          // ← from .env via api.config.js
-      ...customConfig.headers,     // ← per-call overrides (if any)
+      ...DEFAULT_HEADERS,
+      ...getSessionAuthHeaders(),
+      ...customConfig.headers,
     },
   };
 
@@ -83,7 +90,9 @@ export async function apiClient(endpoint, { body, ...customConfig } = {}) {
   const method = String(config.method || 'GET').toUpperCase();
   const cacheable = isCacheableRead(endpoint, method);
   const cacheKey = cacheable
-    ? `${method}:${url}:${body === undefined ? "" : JSON.stringify(body)}`
+    ? `${method}:${url}:${JSON.stringify(config.headers)}:${
+        body === undefined ? "" : JSON.stringify(body)
+      }`
     : null;
 
   if (cacheKey) {

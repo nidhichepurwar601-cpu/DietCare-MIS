@@ -4,6 +4,7 @@ import { getCurrentRole } from "../../lib/permissions.js";
 import { getStore, KEYS, getLocalDateKey } from "../../lib/storage.js";
 import { resolveDisplayUnit, resolveQuantity } from "../../lib/storage.js";
 import { SEED_FOOD_MASTER } from "../../data/seeds.js";
+import { loadTemplateMappings } from "../../lib/masterData.js";
 
 const mealIcons = {
   Breakfast: "🌅",
@@ -137,6 +138,38 @@ export default function MealPlanModal({
   const [showFullPlan, setShowFullPlan] = useState(true);
   const [serviceStatus, setServiceStatus] = useState({});
   const [, setStoreVersion] = useState(0);
+  const [templateMappings, setTemplateMappings] = useState([]);
+  const [templateMappingError, setTemplateMappingError] = useState("");
+
+  useEffect(() => {
+    const templateId = diet?.templateId ?? diet?.id;
+    if (!isOpen || templateId == null || templateId === "") {
+      setTemplateMappings([]);
+      setTemplateMappingError("");
+      return undefined;
+    }
+
+    let active = true;
+    loadTemplateMappings(templateId, diet?.dietTypeId ?? diet?.id)
+      .then((loadedMappings) => {
+        if (active) {
+          setTemplateMappings(loadedMappings);
+          setTemplateMappingError("");
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setTemplateMappings([]);
+          setTemplateMappingError(
+            error?.message || "Unable to load this template's meal items.",
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, diet?.templateId, diet?.id, diet?.dietTypeId]);
 
   useEffect(() => {
     const refresh = () => setStoreVersion((version) => version + 1);
@@ -280,8 +313,21 @@ export default function MealPlanModal({
 
   // TEMPLATE RESOLUTION: tolerate mappings created by either the Master Template editor
   // or older saved records (numeric IDs, string IDs, or embedded food objects).
-  const mealPlan = mappings
-    .filter((mapping) => Number(mapping.dietTypeId) === Number(diet.id))
+  const selectedTemplateId = diet.templateId ?? diet.id;
+  const availableMappings = [
+    ...mappings.filter(
+      (mapping) =>
+        mapping.dietTemplateId == null ||
+        Number(mapping.dietTemplateId) !== Number(selectedTemplateId),
+    ),
+    ...templateMappings,
+  ];
+  const mealPlan = availableMappings
+    .filter((mapping) =>
+      mapping.dietTemplateId != null
+        ? Number(mapping.dietTemplateId) === Number(selectedTemplateId)
+        : Number(mapping.dietTypeId) === Number(diet.dietTypeId ?? diet.id),
+    )
     .map((mapping) => {
       const mealType =
         mealTypes.find(
@@ -417,6 +463,14 @@ export default function MealPlanModal({
       }
     >
       <div className="space-y-5">
+        {templateMappingError && (
+          <div
+            role="alert"
+            className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+          >
+            {templateMappingError}
+          </div>
+        )}
         <div className="rounded-lg bg-blue-50 border border-blue-100 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>

@@ -2,49 +2,93 @@
  * ============================================================
  *  DietCare MIS — Central API Configuration
  * ============================================================
- *  ✅ ALL server connection details are driven by .env
+ *  Runtime connection settings can be changed after build in
+ *  public/runtime-config.js. Authentication is read from sessionStorage.
  *
- *  To point the app at a different server:
- *    1. Open .env in the project root
- *    2. Change VITE_API_HOST / VITE_API_PORT / VITE_API_BASE_PATH
- *    3. Save — Vite hot-reloads automatically (or restart dev server)
+ *  After deployment, edit dist/runtime-config.js and reload the app.
  *
  *  DO NOT hard-code IP addresses anywhere else in the codebase.
  *  Import { API_CONFIG } or named exports from this file instead.
  * ============================================================
  */
 
-// ── Connection (from .env) ────────────────────────────────────
-const HOST      = import.meta.env.VITE_API_HOST      || '192.168.1.14';
-const PORT      = import.meta.env.VITE_API_PORT      || '8085';
-const BASE_PATH = import.meta.env.VITE_API_BASE_PATH || '/dietcare';
+// Runtime settings override the Vite environment values, which are only
+// available as defaults baked in during development/build.
+const runtimeConfig = () =>
+  typeof window !== "undefined" ? window.DIETCARE_RUNTIME_CONFIG || {} : {};
 
-// ── Auth (from .env) ─────────────────────────────────────────
-const USER_ID    = import.meta.env.VITE_API_USER_ID    || 'aureus';
-const CLINIC_ID  = import.meta.env.VITE_API_CLINIC_ID  || 'aureus';
-const ZONE_ID    = import.meta.env.VITE_API_ZONE_ID    || 'aureus';
-const AUTH_TOKEN = import.meta.env.VITE_API_AUTH_TOKEN ||
-  'SmartCare eyJhbGciOiJIUzI1NiJ9.eyJjbGluaWMiOiJhdXJldXMiLCJzdWIiOiJkZW1vZDEyMzQiLCJpYXQiOjE3ODk5ODg5MDUsImV4cCI6MTc5MDAxMDUwNX0.TvzJxi7kCNtroWvoIBWNjlSV8yGUbPzlgCkFoV-0w7I';
-
-// ── Misc (from .env) ─────────────────────────────────────────
-const TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 20000;
-
-/**
- * Assembled base URL — e.g. "http://192.168.1.14:8085/dietcare"
- * Change HOST / PORT / BASE_PATH in .env; this updates automatically.
- */
-const BASE_URL = `http://${HOST}:${PORT}${BASE_PATH}`;
-
-// ── Default request headers ──────────────────────────────────
-const DEFAULT_HEADERS = {
-  'Content-Type': 'application/json',
-  get 'userid'() { return sessionStorage.getItem('UserId') || localStorage.getItem('UserId') || USER_ID; },
-  get 'clinicid'() { return sessionStorage.getItem('ClinicId') || localStorage.getItem('ClinicId') || CLINIC_ID; },
-  get 'zoneid'() { return sessionStorage.getItem('ZONEID') || localStorage.getItem('ZONEID') || ZONE_ID; },
-  get 'Authorization'() { return sessionStorage.getItem('AUTHTOKEN') || localStorage.getItem('AUTHTOKEN') || AUTH_TOKEN; }
+const setting = (runtimeKey, envValue, fallback = "") => {
+  const config = runtimeConfig();
+  const runtimeValue = config[runtimeKey];
+  if (Object.hasOwn(config, runtimeKey) && runtimeValue !== null) {
+    return String(runtimeValue ?? "").trim();
+  }
+  return (
+    String(runtimeValue ?? "").trim() ||
+    String(envValue ?? "").trim() ||
+    fallback
+  );
 };
 
-// ── Endpoint map (relative paths only) ──────────────────────
+function getConnectionSettings() {
+  return {
+    protocol: setting(
+      "VITE_API_PROTOCOL",
+      import.meta.env.VITE_API_PROTOCOL,
+      "http",
+    ).replace(/:$/, ""),
+    host: setting("VITE_API_HOST", import.meta.env.VITE_API_HOST),
+    port: setting("VITE_API_PORT", import.meta.env.VITE_API_PORT),
+    basePath: setting("VITE_API_BASE_PATH", import.meta.env.VITE_API_BASE_PATH),
+  };
+}
+
+function buildBaseUrl() {
+  const { protocol, host, port, basePath } = getConnectionSettings();
+  if (!host) {
+    throw new Error(
+      "API host is not configured. Set VITE_API_HOST in runtime-config.js.",
+    );
+  }
+  const address =
+    host.startsWith("http://") || host.startsWith("https://")
+      ? host
+      : protocol + "://" + host;
+  const url = new URL(address);
+  if (port) url.port = port;
+  const pathSegments = [url.pathname, basePath]
+    .map((segment) => segment.replace(/^\/+|\/+$/g, ""))
+    .filter(Boolean);
+  return url.origin + (pathSegments.length ? `/${pathSegments.join("/")}` : "");
+}
+
+const readSessionValue = (...keys) => {
+  if (typeof sessionStorage === "undefined") return "";
+  for (const key of keys) {
+    const value = sessionStorage.getItem(key);
+    if (value && value.trim()) return value.trim();
+  }
+  return "";
+};
+
+export function getSessionAuthHeaders() {
+  const headers = {};
+  const values = [
+    ["userid", ["UserId", "userId", "userid"]],
+    ["clinicid", ["ClinicId", "clinicId", "clinicid"]],
+    ["zoneid", ["ZONEID", "ZoneId", "zoneId", "zoneid"]],
+    ["Authorization", ["AUTHTOKEN", "Authorization", "authToken"]],
+  ];
+  values.forEach(([header, keys]) => {
+    const value = readSessionValue(...keys);
+    if (value) headers[header] = value;
+  });
+  return headers;
+}
+
+const TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 20000;
+const DEFAULT_HEADERS = { "Content-Type": "application/json" };
+
 const ENDPOINTS = {
   DIET_TEMPLATE: {
     CREATE:        '/diet/template/create',
@@ -161,18 +205,20 @@ const ENDPOINTS = {
 };
 
 // ── Named exports (tree-shakeable) ───────────────────────────
-export { BASE_URL, ENDPOINTS, DEFAULT_HEADERS, TIMEOUT_MS, HOST, PORT, BASE_PATH };
+export { ENDPOINTS, DEFAULT_HEADERS, TIMEOUT_MS };
 
-/**
- * Legacy-compatible named export.
- * All existing code using `import { API_CONFIG } from '../config/api.config'`
- * continues to work without any changes.
- */
 export const API_CONFIG = {
-  BASE_URL,
+  get BASE_URL() {
+    return buildBaseUrl();
+  },
   ENDPOINTS,
   DEFAULT_HEADERS,
   TIMEOUT_MS,
 };
+
+export const BASE_URL = API_CONFIG.BASE_URL;
+export const HOST = setting("VITE_API_HOST", import.meta.env.VITE_API_HOST);
+export const PORT = setting("VITE_API_PORT", import.meta.env.VITE_API_PORT);
+export const BASE_PATH = setting("VITE_API_BASE_PATH", import.meta.env.VITE_API_BASE_PATH);
 
 export default API_CONFIG;
