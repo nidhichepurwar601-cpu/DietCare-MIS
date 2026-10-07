@@ -10,6 +10,29 @@ export const KEYS = {
 
 export const STANDARD_UNITS = ["g", "kg", "ml", "L", "piece", "slice", "cup", "bowl", "glass"];
 
+const appStore = new Map();
+const PRESERVED_APP_STORAGE_KEYS = new Set(["hd_role_permissions"]);
+
+export function clearLegacyAppStorage() {
+  appStore.clear();
+  try {
+    const keys = Array.from({ length: localStorage.length }, (_, index) =>
+      localStorage.key(index),
+    ).filter(
+      (key) =>
+        key &&
+        ((key.startsWith("hd_") && !PRESERVED_APP_STORAGE_KEYS.has(key)) ||
+          key === "mealConsumptionDaily"),
+    );
+    keys.forEach((key) => localStorage.removeItem(key));
+  } catch (error) {
+    console.warn("Could not clear legacy DietCare browser data.", error);
+  }
+}
+
+const cloneStoreValue = (value) =>
+  value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+
 export function normalizeUnit(unit) {
   const value = String(unit || "").trim().toLowerCase();
   const aliases = {
@@ -63,24 +86,20 @@ export function resolveDisplayUnit(
 }
 
 export function getStore(key, fallback = []) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+  return appStore.has(key) ? cloneStoreValue(appStore.get(key)) : fallback;
 }
 
 export function setStore(key, data) {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-    // Notify same-tab screens immediately; the native storage event only fires in other tabs.
-    window.dispatchEvent(new CustomEvent("dietcare-store-updated", { detail: { key } }));
-  } catch {}
+  appStore.set(key, cloneStoreValue(data));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("dietcare-store-updated", { detail: { key } }),
+    );
+  }
 }
 
 export function initStore(key, seedData) {
-  if (!localStorage.getItem(key)) setStore(key, seedData);
+  if (!appStore.has(key)) setStore(key, seedData);
 }
 
 export function addRecord(key, record) {

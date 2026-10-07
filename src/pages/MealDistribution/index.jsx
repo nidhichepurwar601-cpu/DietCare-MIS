@@ -28,6 +28,13 @@ import {
   hasPermission,
   PERMISSIONS,
 } from "../../lib/permissions.js";
+import mealDeliveryService from "../../services/mealDeliveryService.js";
+import {
+  assertApiSuccess,
+  extractApiId,
+  extractApiRecord,
+  extractApiRows,
+} from "../../lib/apiData.js";
 
 const MEALS = [
   "Breakfast",
@@ -175,6 +182,8 @@ export default function MealDistribution() {
   const [intakeItems, setIntakeItems] = useState([]);
   const [intakeRemark, setIntakeRemark] = useState("");
   const [issue, setIssue] = useState("");
+  const [apiError, setApiError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const refresh = () => {
@@ -319,6 +328,93 @@ export default function MealDistribution() {
     ],
   );
 
+  useEffect(() => {
+    let active = true;
+    const loadDeliveriesFromApi = async () => {
+      try {
+        const response = await mealDeliveryService.getAllDeliveries({
+          serviceDate,
+          ward: "",
+          mealTypeId: "",
+          deliveryStatus: "",
+          nurseStatus: "",
+          intakeStatus: "",
+          searchText: "",
+          paginationInfo: { currentPage: 0, pageSize: 100 },
+        });
+        assertApiSuccess(response, "meal delivery list");
+        const apiRows = extractApiRows(
+          response,
+          (row) => row.patientId != null && row.mealTypeId != null,
+        );
+        if (!active) return;
+
+        const nextMeals = { ...(getStore(MEAL_STATUS_KEY, {}) || {}) };
+        const nextCare = { ...(getStore(CARE_STATUS_KEY, {}) || {}) };
+        const deliveryIds =
+          getStore("hd_meal_delivery_api_ids", {}) || {};
+        const deliveryItemIds =
+          getStore("hd_meal_delivery_api_item_ids", {}) || {};
+        apiRows.forEach((delivery) => {
+          const meal = mealNameById(delivery.mealTypeId);
+          const date =
+            delivery.serviceDate ?? delivery.deliveryDate ?? serviceDate;
+          const key = `${date}-${delivery.patientId}-${meal}`;
+          const status = String(
+            delivery.deliveryStatus ?? delivery.status ?? "Pending",
+          )
+            .toLowerCase()
+            .replace(/\b\w/g, (letter) => letter.toUpperCase());
+          if (DELIVERY_STATUSES.includes(status)) nextMeals[key] = status;
+
+          const nurseStatus = String(delivery.nurseStatus ?? "").toLowerCase();
+          const intakeStatus = String(
+            delivery.intakeStatus ?? "",
+          ).toLowerCase();
+          if (intakeStatus === "completed") {
+            nextCare[key] = "Intake Completed";
+          } else if (nurseStatus === "finished") {
+            nextCare[key] = "Intake Pending";
+          } else if (status === "Delivered") {
+            nextCare[key] = "Waiting for Nurse";
+          }
+          const id =
+            delivery.id ?? delivery.mealDeliveryId ?? delivery.deliveryId;
+          if (id != null) {
+            deliveryIds[key] = id;
+            (delivery.items || delivery.mealDeliveryItems || []).forEach(
+              (item) => {
+                if (item.id != null && item.foodId != null) {
+                  deliveryItemIds[`${id}:${item.foodId}`] = item.id;
+                }
+              },
+            );
+          }
+        });
+        setMealStatus(nextMeals);
+        setCareStatus(nextCare);
+        setStore(MEAL_STATUS_KEY, nextMeals);
+        setStore(CARE_STATUS_KEY, nextCare);
+        setStore("hd_meal_delivery_api_ids", deliveryIds);
+        setStore("hd_meal_delivery_api_item_ids", deliveryItemIds);
+        setStore("hd_meal_delivery_api_rows", apiRows);
+        setApiError("");
+      } catch (error) {
+        console.error("Meal delivery API refresh failed", error);
+        if (active) {
+          setApiError(
+            error?.message ||
+              "Could not load meal deliveries from the server.",
+          );
+        }
+      }
+    };
+    loadDeliveriesFromApi();
+    return () => {
+      active = false;
+    };
+  }, [serviceDate]);
+
   const counts = useMemo(
     () => ({
       total: rows.length,
@@ -333,7 +429,155 @@ export default function MealDistribution() {
     [rows],
   );
 
-  const setDelivery = (row, next) => {
+  const ensureDeliveryRecord = async (row) => {
+    const mealTypeId = mealIdByName(activeMeal);
+    if (mealTypeId == null) {
+      throw new Error(`No backend meal type is configured for ${activeMeal}.`);
+    }
+    const key = `${serviceDate}-${row.patient.id}-${activeMeal}`;
+    const cachedIds = getStore("hd_meal_delivery_api_ids", {}) || {};
+    if (cachedIds[key] != null) return cachedIds[key];
+
+    const matchesDelivery = (delivery) =>
+      String(delivery.patientId ?? "") === String(row.patient.id) &&
+      String(delivery.mealTypeId ?? "") === String(mealTypeId) &&
+      String(delivery.serviceDate ?? delivery.deliveryDate ?? "") ===
+        String(serviceDate);
+    let deliveries = getStore("hd_meal_delivery_api_rows", []) || [];
+    let delivery = deliveries.find(matchesDelivery);
+    if (!delivery) {
+      const response = assertApiSuccess(
+        await mealDeliveryService.getAllDeliveries({
+          serviceDate,
+          patientId: row.patient.id,
+          ward: "",
+          mealTypeId,
+          deliveryStatus: "",
+          nurseStatus: "",
+          intakeStatus: "",
+          searchText: "",
+          paginationInfo: { currentPage: 0, pageSize: 100 },
+        }),
+        "meal delivery list",
+      );
+      deliveries = extractApiRows(
+        response,
+        (item) => item.patientId != null && item.mealTypeId != null,
+      );
+      delivery = deliveries.find(matchesDelivery);
+      setStore("hd_meal_delivery_api_rows", deliveries);
+    }
+
+    let deliveryId =
+      delivery?.id ?? delivery?.mealDeliveryId ?? delivery?.deliveryId ?? null;
+    if (deliveryId == null) {
+      const payload = {
+        patientId: row.patient.id,
+        patientName: row.patient.name || "",
+        ward: row.patient.ward || "",
+        bed: row.patient.bedNo || row.patient.bed || "",
+        serviceDate,
+        mealTypeId: Number(mealTypeId),
+        dietTypeId: Number(row.plan?.dietTypeId || row.patient.dietTypeId) || null,
+        dietTemplateId: Number(row.plan?.dietTemplateId) || null,
+        dietName: row.diet?.name || row.plan?.planName || "",
+        deliveryStatus: "Pending",
+        nurseStatus: "Waiting",
+        intakeStatus: "Pending",
+        allergyTags: Array.isArray(row.patient.allergens)
+          ? row.patient.allergens
+              .filter((allergy) => allergy && allergy !== "None")
+              .join(", ")
+          : "",
+        items: row.items.map((item) => ({
+          foodId: Number(item.foodId),
+          servedQuantity: quantityNumber(item.quantity) ?? 0,
+          unit: item.unit || "",
+          intakeStatus: "Pending",
+          remark: "",
+        })),
+        createdBy: "admin",
+      };
+      const response = assertApiSuccess(
+        await mealDeliveryService.createDelivery(payload),
+        "meal delivery creation",
+      );
+      deliveryId = extractApiId(response);
+      if (deliveryId == null) {
+        const refreshed = assertApiSuccess(
+          await mealDeliveryService.getAllDeliveries({
+            serviceDate,
+            patientId: row.patient.id,
+            ward: "",
+            mealTypeId,
+            deliveryStatus: "",
+            nurseStatus: "",
+            intakeStatus: "",
+            searchText: "",
+            paginationInfo: { currentPage: 0, pageSize: 100 },
+          }),
+          "meal delivery list",
+        );
+        deliveries = extractApiRows(
+          refreshed,
+          (item) => item.patientId != null && item.mealTypeId != null,
+        );
+        deliveryId =
+          deliveries.find(matchesDelivery)?.id ??
+          deliveries.find(matchesDelivery)?.mealDeliveryId ??
+          null;
+        setStore("hd_meal_delivery_api_rows", deliveries);
+      }
+      if (deliveryId == null) {
+        throw new Error(
+          "The delivery was created, but the server did not return its ID.",
+        );
+      }
+    }
+
+    setStore("hd_meal_delivery_api_ids", {
+      ...cachedIds,
+      [key]: deliveryId,
+    });
+    return deliveryId;
+  };
+
+  const getDeliveryApiRecord = async (deliveryId) => {
+    const cached = (getStore("hd_meal_delivery_api_rows", []) || []).find(
+      (delivery) =>
+        String(
+          delivery.id ?? delivery.mealDeliveryId ?? delivery.deliveryId,
+        ) === String(deliveryId),
+    );
+    if (cached) return cached;
+
+    const response = assertApiSuccess(
+      await mealDeliveryService.getDeliveryById(deliveryId),
+      "meal delivery details",
+    );
+    const record = extractApiRecord(
+      response,
+      (item) =>
+        String(
+          item.id ?? item.mealDeliveryId ?? item.deliveryId ?? "",
+        ) === String(deliveryId),
+    );
+    if (!record) {
+      throw new Error("The server did not return the meal delivery record.");
+    }
+    setStore("hd_meal_delivery_api_rows", [
+      ...(getStore("hd_meal_delivery_api_rows", []) || []).filter(
+        (item) =>
+          String(
+            item.id ?? item.mealDeliveryId ?? item.deliveryId,
+          ) !== String(deliveryId),
+      ),
+      record,
+    ]);
+    return record;
+  };
+
+  const setDelivery = async (row, next) => {
     const key = `${serviceDate}-${row.patient.id}-${activeMeal}`;
     const previous = deliveryStatusFor(
       mealStatus,
@@ -345,6 +589,24 @@ export default function MealDistribution() {
       return;
     if (next === "Delivered" && !["Prepared", "Delivering"].includes(previous))
       return;
+    try {
+      const deliveryId = await ensureDeliveryRecord(row);
+      assertApiSuccess(
+        await mealDeliveryService.updateDeliveryStatus(deliveryId, {
+          status: next,
+          remarks: "",
+          updatedBy: "admin",
+        }),
+        "meal delivery status update",
+      );
+      setApiError("");
+    } catch (error) {
+      console.error("Meal delivery status update failed", error);
+      setApiError(
+        error?.message || "Could not update meal delivery on the server.",
+      );
+      return;
+    }
     const updated = { ...mealStatus, [key]: next };
     setMealStatus(updated);
     setStore(MEAL_STATUS_KEY, updated);
@@ -373,8 +635,27 @@ export default function MealDistribution() {
     );
   };
 
-  const markMealFinished = (row) => {
+  const markMealFinished = async (row) => {
     if (row.delivery !== "Delivered") return;
+    try {
+      const deliveryId = await ensureDeliveryRecord(row);
+      const deliveryRecord = await getDeliveryApiRecord(deliveryId);
+      assertApiSuccess(
+        await mealDeliveryService.updateDeliveryById(deliveryId, {
+          ...deliveryRecord,
+          nurseStatus: "Finished",
+          updatedBy: "admin",
+        }),
+        "nurse meal confirmation",
+      );
+      setApiError("");
+    } catch (error) {
+      console.error("Nurse meal confirmation failed", error);
+      setApiError(
+        error?.message || "Could not save the nurse confirmation.",
+      );
+      return;
+    }
     const key = `${serviceDate}-${row.patient.id}-${activeMeal}`;
     const updated = { ...careStatus, [key]: "Intake Pending" };
     setCareStatus(updated);
@@ -436,13 +717,65 @@ export default function MealDistribution() {
       }),
     );
 
-  const saveIntake = () => {
-    if (!selected) return;
+  const saveIntake = async () => {
+    if (!selected || saving) return;
     if (
       !intakeItems.length ||
       intakeItems.some((x) => x.intakePercent === "Pending")
     )
       return;
+    setSaving(true);
+    try {
+      const deliveryId = await ensureDeliveryRecord(selected);
+      let itemIds = getStore("hd_meal_delivery_api_item_ids", {}) || {};
+      const missingItem = intakeItems.some(
+        (item) => itemIds[`${deliveryId}:${item.foodId}`] == null,
+      );
+      if (missingItem) {
+        const deliveryRecord = await getDeliveryApiRecord(deliveryId);
+        extractApiRows(
+          deliveryRecord,
+          (item) => item.id != null && item.foodId != null,
+        ).forEach((item) => {
+          itemIds[`${deliveryId}:${item.foodId}`] = item.id;
+        });
+        setStore("hd_meal_delivery_api_item_ids", itemIds);
+      }
+      const items = intakeItems.map((item) => {
+        const serverItemId = itemIds[`${deliveryId}:${item.foodId}`];
+        if (serverItemId == null) {
+          throw new Error(
+            `The server delivery is missing "${item.name}" for intake recording.`,
+          );
+        }
+        return {
+          id: serverItemId,
+          foodId: item.foodId,
+          servedQuantity: quantityNumber(item.quantity) ?? 0,
+          unit: item.unit || "",
+          intakeStatus:
+            item.intakePercent === "Taken" ? "Taken" : "Not Taken",
+          remark: item.foodRemark || "",
+        };
+      });
+      assertApiSuccess(
+        await mealDeliveryService.saveIntake(deliveryId, {
+          items,
+          mealRemark: intakeRemark,
+          trayIssue: issue,
+          intakeStatus: "Completed",
+          updatedBy: "admin",
+        }),
+        "meal intake save",
+      );
+      setApiError("");
+    } catch (error) {
+      console.error("Meal intake save failed", error);
+      setApiError(error?.message || "Could not save meal intake to the server.");
+      return;
+    } finally {
+      setSaving(false);
+    }
     const key = INTAKE_KEY(selected.patient.id, serviceDate);
     const existing = getStore(key, {
       patientId: selected.patient.id,
@@ -530,6 +863,14 @@ export default function MealDistribution() {
         noPadding={true}
       >
         <div className="space-y-4 p-4">
+          {apiError && (
+            <div
+              className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+              role="alert"
+            >
+              Server sync failed: {apiError}
+            </div>
+          )}
           {counts.nurse > 0 && (
           <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <div className="flex items-start gap-3">

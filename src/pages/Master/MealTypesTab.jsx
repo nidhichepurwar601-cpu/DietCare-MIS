@@ -88,7 +88,7 @@ export default function MealTypesTab() {
         return;
       }
     } catch (error) {
-      console.warn("Meal Type API unavailable; using LocalStorage.", error);
+      console.warn("Meal Type API unavailable; using current-session data only.", error);
     }
     setData(getStore(KEYS.MEAL_TYPES, []) || []);
   };
@@ -142,7 +142,7 @@ export default function MealTypesTab() {
         : addRecord(KEYS.MEAL_TYPES, localRecord);
 
       setIsOpen(false);
-      await load();
+      setData(getStore(KEYS.MEAL_TYPES, []) || []);
     } catch (error) {
       console.error("Meal Type API Error:", error);
 
@@ -152,7 +152,10 @@ export default function MealTypesTab() {
         : addRecord(KEYS.MEAL_TYPES, form);
 
       setIsOpen(false);
-      await load();
+      setData(getStore(KEYS.MEAL_TYPES, []) || []);
+      alert(
+        `Meal Type was saved locally because the server request failed: ${error?.message || "Unknown API error."}`,
+      );
     }
   };
 
@@ -229,7 +232,7 @@ export default function MealTypesTab() {
             }
             deleteRecord(KEYS.MEAL_TYPES, deleting.id);
             setDeleting(null);
-            await load();
+            setData(getStore(KEYS.MEAL_TYPES, []) || []);
           } catch (error) {
             console.error("Meal Type delete API Error:", error);
             alert(error?.message || "Unable to delete Meal Type.");

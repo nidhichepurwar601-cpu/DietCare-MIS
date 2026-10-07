@@ -13,6 +13,20 @@ export class APIError extends Error {
   }
 }
 
+const READ_CACHE_TTL_MS = 10000;
+const readCache = new Map();
+const pendingReads = new Map();
+let cacheGeneration = 0;
+
+const isReadOnlyPost = (endpoint) =>
+  /\/(?:patient\/get|diet\/type\/get|diet\/template\/get\/all|diettemplate\/item\/get\/by\/template\/[^/]+|food\/get|mealtype\/get|dietmanager\/get|kitchen\/get|mealdelivery\/get|clinicalalert\/get|notification\/get|dashboard\/get)\/?$/.test(
+    endpoint,
+  );
+
+const isCacheableRead = (endpoint, method) =>
+  method === "GET" ||
+  (method === "POST" && isReadOnlyPost(endpoint));
+
 async function parseBody(response) {
   if (response.status === 204) return null;
   try {
@@ -67,26 +81,61 @@ export async function apiClient(endpoint, { body, ...customConfig } = {}) {
 
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
   const method = String(config.method || 'GET').toUpperCase();
+  const cacheable = isCacheableRead(endpoint, method);
+  const cacheKey = cacheable
+    ? `${method}:${url}:${body === undefined ? "" : JSON.stringify(body)}`
+    : null;
 
-  try {
+  if (cacheKey) {
+    const cached = readCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.data;
+    if (cached) readCache.delete(cacheKey);
+    const pending = pendingReads.get(cacheKey);
+    if (pending) return pending;
+  }
+
+  const generation = cacheGeneration;
+  const request = (async () => {
     try {
-      return await requestOnce(url, config);
-    } catch (error) {
-      const retryable =
-        method === 'GET' &&
-        (error?.status === 502 || error?.status === 503 || error?.status === 504);
-      if (retryable) {
+      try {
         return await requestOnce(url, config);
+      } catch (error) {
+        const retryable =
+          method === 'GET' &&
+          (error?.status === 502 || error?.status === 503 || error?.status === 504);
+        if (retryable) {
+          return await requestOnce(url, config);
+        }
+        throw error;
       }
-      throw error;
+    } catch (error) {
+      if (error instanceof APIError) throw error;
+      if (error?.name === 'AbortError') {
+        throw new Error('The request timed out. Please try again.');
+      }
+      console.error('[API Client] Network request failed:', url);
+      throw new Error('Network error or server is unreachable. Please try again later.');
     }
-  } catch (error) {
-    if (error instanceof APIError) throw error;
-    if (error?.name === 'AbortError') {
-      throw new Error('The request timed out. Please try again.');
+  })();
+
+  if (cacheKey) pendingReads.set(cacheKey, request);
+  try {
+    const data = await request;
+    if (cacheKey && generation === cacheGeneration) {
+      readCache.set(cacheKey, {
+        data,
+        expiresAt: Date.now() + READ_CACHE_TTL_MS,
+      });
+    } else if (method !== "GET" && !isReadOnlyPost(endpoint)) {
+      cacheGeneration += 1;
+      readCache.clear();
+      pendingReads.clear();
     }
-    console.error('[API Client] Network request failed:', url);
-    throw new Error('Network error or server is unreachable. Please try again later.');
+    return data;
+  } finally {
+    if (cacheKey && pendingReads.get(cacheKey) === request) {
+      pendingReads.delete(cacheKey);
+    }
   }
 }
 
@@ -103,4 +152,3 @@ apiClient.delete = (endpoint, customConfig = {}) =>
   apiClient(endpoint, { ...customConfig, method: 'DELETE' });
 
 export default apiClient;
-

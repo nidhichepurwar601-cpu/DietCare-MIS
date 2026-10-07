@@ -38,10 +38,10 @@ const BASE_URL = `http://${HOST}:${PORT}${BASE_PATH}`;
 // ── Default request headers ──────────────────────────────────
 const DEFAULT_HEADERS = {
   'Content-Type': 'application/json',
-  'userid':        USER_ID,
-  'clinicid':      CLINIC_ID,
-  'zoneid':        ZONE_ID,
-  'Authorization': AUTH_TOKEN,
+  get 'userid'() { return sessionStorage.getItem('UserId') || localStorage.getItem('UserId') || USER_ID; },
+  get 'clinicid'() { return sessionStorage.getItem('ClinicId') || localStorage.getItem('ClinicId') || CLINIC_ID; },
+  get 'zoneid'() { return sessionStorage.getItem('ZONEID') || localStorage.getItem('ZONEID') || ZONE_ID; },
+  get 'Authorization'() { return sessionStorage.getItem('AUTHTOKEN') || localStorage.getItem('AUTHTOKEN') || AUTH_TOKEN; }
 };
 
 // ── Endpoint map (relative paths only) ──────────────────────
@@ -101,9 +101,10 @@ const ENDPOINTS = {
   ORDER_ITEM: {
     /** Update status of a single prepared item inside a kitchen order */
     UPDATE_STATUS: (id) => `/kitchen/update/item/status/${id}`,
+    ORDER_ITEM_STATUS: (id) => `/kitchen/update/item/status/${id}`,
   },
   KITCHEN_SUMMARY: {
-    GET_BY_DATE: (date) => `/kitchen/summary/get/by/${date}`,
+    GET_BY_DATE: (date) => `/kitchen/summary?serviceDate=${encodeURIComponent(date)}`,
   },
   MEAL_DELIVERY: {
     CREATE:        '/mealdelivery/create',
@@ -118,17 +119,44 @@ const ENDPOINTS = {
     UPDATE_STATUS: (id) => `/mealdelivery/update/item/status/${id}`,
   },
   MEAL_DELIVERY_SUMMARY: {
-    GET_BY_DATE: (date) => `/mealdelivery/summary/get/by/${date}`,
+    GET_BY_DATE: (date) => `/mealdelivery/summary?serviceDate=${encodeURIComponent(date)}`,
   },
   PATIENT_DETAILS: {
     CREATE:       '/patient/create',
     GET_ALL:      '/patient/get',
     GET_BY_ID:    (id) => `/patient/get/by/${id}`,
     UPDATE_BY_ID: (id) => `/patient/update/${id}`,
+    DELETE:       (id) => `/patient/delete/${id}`,
   },
   PATIENT_DIET_PLAN: {
     CREATE:    '/dietmanager/create',
     GET_BY_ID: (id) => `/dietmanager/get/by/${id}`,
+  },
+  DIET_MANAGER: {
+    CREATE:        '/dietmanager/create',
+    GET_BY_ID:     (id) => `/dietmanager/get/by/${id}`,
+    GET_ALL:       '/dietmanager/get',
+    UPDATE_BY_ID:  (id) => `/dietmanager/update/${id}`,
+    DELETE:        (id) => `/dietmanager/delete/${id}`,
+    UPDATE_STATUS: (id) => `/dietmanager/update/status/${id}`,
+  },
+  CLINICAL_ALERT: {
+    CREATE:       '/clinicalalert/create',
+    GET_BY_ID:    (id) => `/clinicalalert/get/by/${id}`,
+    GET_ALL:      '/clinicalalert/get',
+    UPDATE_BY_ID: (id) => `/clinicalalert/update/${id}`,
+    ACKNOWLEDGE:  (id) => `/clinicalalert/acknowledge/${id}`,
+    DELETE:       (id) => `/clinicalalert/delete/${id}`,
+  },
+  NOTIFICATION: {
+    CREATE:        '/notification/create',
+    GET_BY_ID:     (id) => `/notification/get/by/${id}`,
+    GET_ALL:       '/notification/get',
+    STATUS_UPDATE: (id) => `/notification/update/status/${id}`,
+    DELETE:        (id) => `/notification/delete/${id}`,
+  },
+  DASHBOARD: {
+    POST: '/dashboard/get',
   },
 };
 

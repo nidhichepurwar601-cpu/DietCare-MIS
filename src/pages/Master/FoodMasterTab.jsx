@@ -112,20 +112,51 @@ export default function FoodMasterTab() {
                 String(item.code || "").toLowerCase() ===
                   String(row.code || "").toLowerCase(),
             );
-            let nutrition = {};
-            try {
-              const nutritionResponse =
-                await foodNutritionService.getNutritionById(row.backendFoodId);
-              nutrition =
-                extractRows(nutritionResponse)[0] ||
-                nutritionResponse?.data ||
-                nutritionResponse?.result ||
-                nutritionResponse ||
-                {};
-            } catch {}
+            const hasNutrition =
+              old?.nutritionLoaded ||
+              old?.nutritionId != null ||
+              ["calories", "protein", "carbs", "fat", "fiber"].some(
+                (key) => Number(old?.[key]) > 0,
+              );
+            let nutrition = old
+              ? {
+                  calories: old.calories,
+                  protein: old.protein,
+                  carbohydrates: old.carbs,
+                  fat: old.fat,
+                  fiber: old.fiber,
+                  id: old.nutritionId,
+                }
+              : {};
+            let nutritionLoaded = Boolean(hasNutrition);
+            if (!hasNutrition) {
+              try {
+                const nutritionResponse =
+                  await foodNutritionService.getNutritionById(
+                    row.backendFoodId,
+                  );
+                nutrition =
+                  extractRows(nutritionResponse)[0] ||
+                  nutritionResponse?.data ||
+                  nutritionResponse?.result ||
+                  nutritionResponse ||
+                  {};
+                nutritionLoaded = true;
+              } catch (error) {
+                if (error?.status === 404) {
+                  nutritionLoaded = true;
+                } else {
+                  console.warn(
+                    `Unable to load nutrition for food ${row.backendFoodId}.`,
+                    error,
+                  );
+                }
+              }
+            }
             return {
               ...old,
               ...row,
+              nutritionLoaded,
               id: old?.id ?? row.id,
               backendFoodId: Number(row.backendFoodId),
               calories: Number(nutrition.calories ?? old?.calories ?? 0),
@@ -146,7 +177,7 @@ export default function FoodMasterTab() {
         return;
       }
     } catch (error) {
-      console.warn("Food API unavailable; using LocalStorage.", error);
+      console.warn("Food API unavailable; using current-session data only.", error);
     }
     setData(getStore(KEYS.FOOD_MASTER, []) || []);
   };
@@ -309,7 +340,7 @@ export default function FoodMasterTab() {
         : addRecord(KEYS.FOOD_MASTER, d);
 
       setIsOpen(false);
-      await load();
+      setData(getStore(KEYS.FOOD_MASTER, []) || []);
     } catch (error) {
       console.error("Food API Error:", error);
 
@@ -330,7 +361,10 @@ export default function FoodMasterTab() {
         : addRecord(KEYS.FOOD_MASTER, d);
 
       setIsOpen(false);
-      load();
+      setData(getStore(KEYS.FOOD_MASTER, []) || []);
+      alert(
+        `Food item was saved locally because the server request failed: ${error?.message || "Unknown API error."}`,
+      );
     }
   };
 
@@ -460,7 +494,7 @@ export default function FoodMasterTab() {
             // Nutrition has a unique food_id relationship, so resolve and
             // remove the nutrition row before deleting the parent Food row.
             let nutritionId = deleting.nutritionId;
-            if (!nutritionId) {
+            if (!nutritionId && !deleting.nutritionLoaded) {
               try {
                 const nutritionResponse =
                   await foodNutritionService.getNutritionById(backendId);
@@ -471,8 +505,8 @@ export default function FoodMasterTab() {
                   nutritionResponse ||
                   {};
                 nutritionId = nutritionRecord?.id;
-              } catch {
-                // No nutrition row is valid for a Food record.
+              } catch (error) {
+                if (error?.status !== 404) throw error;
               }
             }
 
@@ -506,7 +540,7 @@ export default function FoodMasterTab() {
             }
             deleteRecord(KEYS.FOOD_MASTER, deleting.id);
             setDeleting(null);
-            await load();
+            setData(getStore(KEYS.FOOD_MASTER, []) || []);
           } catch (error) {
             console.error("Food delete API Error:", error);
             alert(error?.message || "Unable to delete Food Item.");

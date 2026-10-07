@@ -132,10 +132,7 @@ export default function MealPlanModal({
 }) {
   const [mealStatus, setMealStatus] = useState({});
   const [consumedQuantities, setConsumedQuantities] = useState({});
-  const [storageReady, setStorageReady] = useState(false);
   const [todayKey, setTodayKey] = useState(getTodayKey);
-  const [loadedScope, setLoadedScope] = useState("");
-  const [loadedDay, setLoadedDay] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showFullPlan, setShowFullPlan] = useState(true);
   const [serviceStatus, setServiceStatus] = useState({});
@@ -151,16 +148,10 @@ export default function MealPlanModal({
     };
   }, []);
 
-  const storageScope = `${patientId || "diet"}-${diet?.id || "none"}`;
-
   useEffect(() => {
     const day = getTodayKey();
     setTodayKey(day);
-    setStorageReady(false);
     try {
-      const saved = JSON.parse(
-        localStorage.getItem("mealConsumptionDaily") || "{}",
-      );
       const sharedMealStatus = getStore("hd_meal_status", {}) || {};
       const dayStatuses = {};
       Object.entries(sharedMealStatus).forEach(([key, value]) => {
@@ -169,12 +160,11 @@ export default function MealPlanModal({
           dayStatuses[String(key).slice(prefix.length)] = value;
       });
       setServiceStatus(dayStatuses);
-      const record = saved?.[day]?.[storageScope] || {};
       const intake = patientId
         ? getStore(`hd_meal_intake_${patientId}_${day}`, null)
         : null;
-      const syncedStatuses = { ...(record.statuses || {}) };
-      const syncedConsumed = { ...(record.consumedQuantities || {}) };
+      const syncedStatuses = {};
+      const syncedConsumed = {};
       (intake?.foodItems || []).forEach((item) => {
         const mapping = mappings.find(
           (m) =>
@@ -212,10 +202,7 @@ export default function MealPlanModal({
       setMealStatus({});
       setConsumedQuantities({});
     }
-    setStorageReady(true);
-    setLoadedScope(storageScope);
-    setLoadedDay(day);
-  }, [storageScope, todayKey]);
+  }, [patientId, diet?.id, todayKey]);
 
   useEffect(() => {
     const refreshSharedStatus = () => {
@@ -244,36 +231,6 @@ export default function MealPlanModal({
     }, 60000);
     return () => clearInterval(timer);
   }, [todayKey]);
-
-  useEffect(() => {
-    if (
-      !storageReady ||
-      loadedScope !== storageScope ||
-      loadedDay !== todayKey
-    ) {
-      return;
-    }
-    try {
-      const daily = JSON.parse(
-        localStorage.getItem("mealConsumptionDaily") || "{}",
-      );
-      daily[todayKey] = {
-        ...(daily[todayKey] || {}),
-        [storageScope]: { statuses: mealStatus, consumedQuantities },
-      };
-      localStorage.setItem("mealConsumptionDaily", JSON.stringify(daily));
-    } catch {
-      // Ignore storage errors; the current session remains usable.
-    }
-  }, [
-    mealStatus,
-    consumedQuantities,
-    storageReady,
-    storageScope,
-    todayKey,
-    loadedScope,
-    loadedDay,
-  ]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);

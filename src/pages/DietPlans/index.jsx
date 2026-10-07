@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import AppLayout from "../../components/layouts/AppLayout.jsx";
 import {
   ClipboardPlus,
@@ -31,6 +31,14 @@ import {
 } from "../../components/common/MvpTools.jsx";
 import DataTable from "../../components/common/DataTable.jsx";
 import HospitalPage from "../../components/common/HospitalPage.jsx";
+import { loadMasterData } from "../../lib/masterData.js";
+import patientDietPlanService from "../../services/patientDietPlanService.js";
+import {
+  extractPlanId,
+  extractPlanRows,
+  fromApiRow,
+  toDietPlanApiPayload,
+} from "../../services/dietPlanAdapter.js";
 
 const PLAN_KEY = "hd_diet_plans";
 
@@ -103,16 +111,39 @@ const blank = {
 export default function DietPlans({ embedded = false } = {}) {
   const [search, setSearch] = useState("");
   const [plans, setPlans] = useState(() => getStore(PLAN_KEY, []));
+  const [patients, setPatients] = useState(() => getStore(KEYS.PATIENTS, []));
+  const [dietTypes, setDietTypes] = useState(() =>
+    getStore(KEYS.DIET_TYPES, []),
+  );
+  const [dietTemplates, setDietTemplates] = useState(() =>
+    getStore(KEYS.DIET_TEMPLATES, []),
+  );
+  const [mappings, setMappings] = useState(() =>
+    getStore(KEYS.DIET_MAPPING, []),
+  );
+  const [mealTypes, setMealTypes] = useState(() =>
+    getStore(KEYS.MEAL_TYPES, []),
+  );
+  const [foods, setFoods] = useState(() => getStore(KEYS.FOOD_MASTER, []));
   const [form, setForm] = useState(blank);
   const [mode, setMode] = useState("");
   const [selected, setSelected] = useState(null);
   const [toast, setToast] = useState("");
   const [, setStoreVersion] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
   // LIVE STORE SYNC: keep diet-plan rows connected to patient/master/workflow changes.
   useEffect(() => {
     const refresh = () => {
       setStoreVersion((version) => version + 1);
       setPlans(getStore(PLAN_KEY, []));
+      setPatients(getStore(KEYS.PATIENTS, []));
+      setDietTypes(getStore(KEYS.DIET_TYPES, []));
+      setDietTemplates(getStore(KEYS.DIET_TEMPLATES, []));
+      setMappings(getStore(KEYS.DIET_MAPPING, []));
+      setMealTypes(getStore(KEYS.MEAL_TYPES, []));
+      setFoods(getStore(KEYS.FOOD_MASTER, []));
     };
     window.addEventListener("dietcare-store-updated", refresh);
     window.addEventListener("storage", refresh);
@@ -121,12 +152,72 @@ export default function DietPlans({ embedded = false } = {}) {
       window.removeEventListener("storage", refresh);
     };
   }, []);
-  const patients = getStore(KEYS.PATIENTS);
-  const dietTypes = getStore(KEYS.DIET_TYPES);
-  const dietTemplates = getStore(KEYS.DIET_TEMPLATES, []);
-  const mappings = getStore(KEYS.DIET_MAPPING);
-  const mealTypes = getStore(KEYS.MEAL_TYPES);
-  const foods = getStore(KEYS.FOOD_MASTER);
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const [master, planResponse] = await Promise.all([
+        loadMasterData(),
+        patientDietPlanService.getAllPlans({
+          ward: "",
+          dietPlan: "",
+          assignmentStatus: "",
+          searchText: "",
+          paginationInfo: { currentPage: 0, pageSize: 100 },
+        }),
+      ]);
+      if (
+        !planResponse ||
+        planResponse.error ||
+        planResponse.statusCode >= 400 ||
+        planResponse.status >= 400
+      ) {
+        throw new Error(
+          planResponse?.message ||
+            planResponse?.error?.message ||
+            "Could not load diet plans from the server.",
+        );
+      }
+      const cachedPlans = getStore(PLAN_KEY, []) || [];
+      const planRows = extractPlanRows(planResponse)
+        .map((row) => fromApiRow(row, master.dietTemplates))
+        .filter((row) => row && row.id != null)
+        .map((row) => ({
+          ...row,
+          dietHistory:
+            cachedPlans.find((cached) => String(cached.id) === String(row.id))
+              ?.dietHistory || [],
+        }));
+
+      setPatients(master.patients);
+      setDietTypes(master.dietTypes);
+      setDietTemplates(master.dietTemplates);
+      setMappings(master.mappings);
+      setMealTypes(master.mealTypes);
+      setFoods(master.foods);
+      setStore(KEYS.PATIENTS, master.patients);
+      setStore(KEYS.DIET_TYPES, master.dietTypes);
+      setStore(KEYS.DIET_TEMPLATES, master.dietTemplates);
+      setStore(KEYS.DIET_MAPPING, master.mappings);
+      setStore(KEYS.MEAL_TYPES, master.mealTypes);
+      setStore(KEYS.FOOD_MASTER, master.foods);
+      setPlans(planRows);
+      setStore(PLAN_KEY, planRows);
+      return planRows;
+    } catch (error) {
+      console.error("Failed to load diet plans", error);
+      setLoadError(
+        error?.message || "Could not load diet plans from the server.",
+      );
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
   const workflows = getStore("hd_diet_workflow", []);
   const patient = (id) => patients.find((x) => String(x.id) === String(id));
   const dietType = (id) => dietTypes.find((x) => String(x.id) === String(id));
@@ -244,8 +335,9 @@ export default function DietPlans({ embedded = false } = {}) {
     setPlans(x);
     setStore(PLAN_KEY, x);
   };
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
+    if (saving) return;
     if (!form.patientId) {
       setToast("Select a patient first.");
       return;
@@ -352,10 +444,69 @@ export default function DietPlans({ embedded = false } = {}) {
         endDate: nextForm.endDate || nextForm.startDate || "",
       });
     }
-    const savedPlan =
+    let savedPlan =
       mode === "edit"
         ? { ...nextForm, dietHistory }
         : { ...nextForm, id: Date.now() };
+
+    const isUpdate = mode === "edit" && form.id != null && form.id !== "";
+    setSaving(true);
+    try {
+      const response = isUpdate
+        ? await patientDietPlanService.updatePlanById(
+            form.id,
+            toDietPlanApiPayload(
+              { ...nextForm, status: workflowStatus },
+              { template: selectedDietTemplate, isUpdate: true },
+            ),
+          )
+        : await patientDietPlanService.createPlan(
+            toDietPlanApiPayload(
+              { ...nextForm, status: workflowStatus },
+              { template: selectedDietTemplate },
+            ),
+          );
+      if (
+        response?.error ||
+        response?.statusCode >= 400 ||
+        response?.status >= 400
+      ) {
+        throw new Error(
+          response?.message ||
+            response?.error?.message ||
+            "The server rejected the diet plan.",
+        );
+      }
+
+      const savedId = isUpdate ? form.id : extractPlanId(response);
+      const loadedPlans = await loadAll();
+      if (!loadedPlans) {
+        throw new Error("The plan was saved, but the list could not refresh.");
+      }
+      let loadedPlan = loadedPlans.find(
+        (plan) => String(plan.id) === String(savedId),
+      );
+      if (!loadedPlan && !isUpdate) {
+        loadedPlan = loadedPlans
+          .filter(
+            (plan) =>
+              String(plan.patientId) === String(nextForm.patientId) &&
+              String(plan.dietTemplateId) === String(nextForm.dietTemplateId) &&
+              String(plan.startDate) === String(nextForm.startDate),
+          )
+          .sort((a, b) => Number(b.id) - Number(a.id))[0];
+      }
+      if (!loadedPlan) {
+        throw new Error("The plan was saved, but it was not returned by the server.");
+      }
+      savedPlan = { ...loadedPlan, dietHistory };
+    } catch (error) {
+      console.error("Diet plan save failed", error);
+      setToast(error?.message || "Unable to save the diet plan to the server.");
+      return;
+    } finally {
+      setSaving(false);
+    }
 
     // Keep Patient Master, Diet Manager, Clinical Alerts, Dashboard and Delivery/Intake on the same clinical record.
     const parsedAllergens = String(nextForm.allergensText || "")
@@ -432,10 +583,18 @@ export default function DietPlans({ embedded = false } = {}) {
         : null,
       serviceDate: nextForm.startDate || undefined,
     });
+    const currentPlans = getStore(PLAN_KEY, []) || [];
     if (mode === "edit") {
-      persist(plans.map((x) => (x.id === form.id ? savedPlan : x)));
+      persist(
+        currentPlans.map((x) =>
+          String(x.id) === String(form.id) ? savedPlan : x,
+        ),
+      );
     } else {
-      persist([...plans, savedPlan]);
+      persist([
+        ...currentPlans.filter((x) => String(x.id) !== String(savedPlan.id)),
+        savedPlan,
+      ]);
       flow.planId = savedPlan.id;
     }
     const flowList = getStore(workflowKey, []);
@@ -503,7 +662,7 @@ export default function DietPlans({ embedded = false } = {}) {
     });
     setMode("edit");
   };
-  const remove = (x) => {
+  const remove = async (x) => {
     if (x.auto) {
       setToast(
         "This plan is linked to the patient record and cannot be deleted here.",
@@ -511,15 +670,59 @@ export default function DietPlans({ embedded = false } = {}) {
       return;
     }
     if (confirm("Delete this diet plan?")) {
-      persist(plans.filter((p) => p.id !== x.id));
-      setToast("Diet plan deleted.");
+      try {
+        const response = await patientDietPlanService.deletePlan(x.id);
+        if (
+          response?.error ||
+          response?.statusCode >= 400 ||
+          response?.status >= 400
+        ) {
+          throw new Error(
+            response?.message ||
+              response?.error?.message ||
+              "The server rejected the diet plan deletion.",
+          );
+        }
+        const loadedPlans = await loadAll();
+        if (!loadedPlans) {
+          throw new Error("The plan was deleted, but the list could not refresh.");
+        }
+        setToast("Diet plan deleted.");
+      } catch (error) {
+        console.error("Diet plan delete failed", error);
+        setToast(error?.message || "Unable to delete the diet plan.");
+      }
     }
   };
-  const changeStatus = (x) => {
+  const changeStatus = async (x) => {
     if (x.auto) return;
     const current = x.status || "Not Assigned";
     const next = current === "Not Assigned" ? "Planning" : "Not Assigned";
-    persist(plans.map((p) => (p.id === x.id ? { ...p, status: next } : p)));
+    try {
+      const response = await patientDietPlanService.updateAssignmentStatus(
+        x.id,
+        { assignmentStatus: next, updatedBy: "admin" },
+      );
+      if (
+        response?.error ||
+        response?.statusCode >= 400 ||
+        response?.status >= 400
+      ) {
+        throw new Error(
+          response?.message ||
+            response?.error?.message ||
+            "The server rejected the status update.",
+        );
+      }
+      const loadedPlans = await loadAll();
+      if (!loadedPlans) {
+        throw new Error("The status was updated, but the list could not refresh.");
+      }
+    } catch (error) {
+      console.error("Diet plan status update failed", error);
+      setToast(error?.message || "Unable to update the diet plan status.");
+      return;
+    }
     const p = patient(x.patientId) || {};
     appendHistoryEvent({
       type: "diet_plan",
@@ -621,6 +824,26 @@ export default function DietPlans({ embedded = false } = {}) {
     <>
       <Toast message={toast} onClose={() => setToast("")} />
       <div className="diet-plans-page space-y-4">
+        {loadError && (
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+            role="alert"
+          >
+            <span>{loadError}</span>
+            <button
+              type="button"
+              onClick={loadAll}
+              className="rounded-md border border-red-300 px-3 py-1.5 font-medium hover:bg-red-100"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {loading && (
+          <p className="text-sm text-slate-500" role="status">
+            Loading diet plans…
+          </p>
+        )}
         {/* ── Filter bar ─────────────────────────────────────── */}
         <div className="hospital-filter-panel">
           <div className="hospital-field" style={{ flex: "2 1 280px" }}>

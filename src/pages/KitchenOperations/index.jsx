@@ -19,6 +19,12 @@ import {
   syncWorkflowFromMealStatuses,
   getLocalDateKey,
 } from "../../lib/storage.js";
+import kitchenOrderService from "../../services/kitchenOrderService.js";
+import {
+  assertApiSuccess,
+  extractApiId,
+  extractApiRows,
+} from "../../lib/apiData.js";
 
 const MEALS = [
   "Early Morning",
@@ -90,6 +96,7 @@ export default function KitchenOperations() {
   const [, refresh] = useState(0);
   const [screenReady, setScreenReady] = useState(false);
   const [screenError, setScreenError] = useState("");
+  const [apiSyncError, setApiSyncError] = useState("");
 
   useEffect(() => {
     const update = () => {
@@ -438,7 +445,7 @@ export default function KitchenOperations() {
       : status;
   };
 
-  const advancePreparationItem = (meal, item) => {
+  const advancePreparationItem = async (meal, item) => {
     const current = getPreparationItemStatus(meal, item);
 
     // Packed is deliberately not advanced automatically. It can only be
@@ -450,6 +457,7 @@ export default function KitchenOperations() {
 
     const next = nextPreparationItemStatus(current);
     if (next === current) return;
+    if (!(await syncKitchenItemStatus(meal, item, next))) return;
 
     const key = preparationItemKey(meal, item);
     const nextItemStatus = { ...preparationItemStatus, [key]: next };
@@ -586,6 +594,38 @@ export default function KitchenOperations() {
     [preparationMealCounts, preparationTotals],
   );
 
+  useEffect(() => {
+    if (deliveryMode) return undefined;
+    let active = true;
+    const loadKitchenApiData = async () => {
+      try {
+        const ordersResponse = await kitchenOrderService.getAllOrders({
+          preparationDate: serviceDate,
+          mealTypeId:
+            mealTypes.find((meal) => meal.name === mealFilter)?.id || "",
+          status: "",
+          paginationInfo: { currentPage: 1, pageSize: 100 },
+        });
+        assertApiSuccess(ordersResponse, "kitchen order list");
+        if (active) {
+          setStore("hd_kitchen_api_orders", extractApiRows(ordersResponse));
+          setApiSyncError("");
+        }
+      } catch (error) {
+        console.error("Kitchen API refresh failed", error);
+        if (active) {
+          setApiSyncError(
+            error?.message || "Could not refresh kitchen data from the server.",
+          );
+        }
+      }
+    };
+    loadKitchenApiData();
+    return () => {
+      active = false;
+    };
+  }, [deliveryMode, mealFilter, serviceDate]);
+
   const persistMealStatuses = (next) => {
     setMealStatus(next);
     setStore(MEAL_STATUS_KEY, next);
@@ -604,7 +644,196 @@ export default function KitchenOperations() {
     if (nextMeal) setMealFilter(nextMeal);
   };
 
-  const markMealPreparing = (meal) => {
+  const ensureKitchenOrder = async (meal) => {
+    const mealTypeId = mealTypes.find((entry) => entry.name === meal)?.id;
+    if (mealTypeId == null) {
+      throw new Error(`No backend meal type is configured for ${meal}.`);
+    }
+    const orderKey = `${serviceDate}-${mealTypeId}`;
+    const cachedIds = getStore("hd_kitchen_api_order_ids", {}) || {};
+    if (cachedIds[orderKey] != null) return cachedIds[orderKey];
+
+    const matchesOrder = (order) =>
+      String(order.preparationDate ?? order.serviceDate ?? "") ===
+        String(serviceDate) &&
+      String(order.mealTypeId ?? order.meal_type_id ?? "") ===
+        String(mealTypeId);
+    let orders = getStore("hd_kitchen_api_orders", []) || [];
+    let order = orders.find(matchesOrder);
+    if (!order) {
+      const response = assertApiSuccess(
+        await kitchenOrderService.getAllOrders({
+          preparationDate: serviceDate,
+          mealTypeId,
+          status: "",
+          paginationInfo: { currentPage: 1, pageSize: 100 },
+        }),
+        "kitchen order list",
+      );
+      orders = extractApiRows(response);
+      order = orders.find(matchesOrder);
+      setStore("hd_kitchen_api_orders", orders);
+    }
+
+    let orderId =
+      order?.id ?? order?.kitchenOrderId ?? order?.orderId ?? null;
+    if (orderId == null) {
+      const group = preparationGroups.find((entry) => entry.meal === meal);
+      const items = (group?.items || [])
+        .map((item) => {
+          const food = foods.find(
+            (entry) =>
+              String(entry.name).toLowerCase() ===
+              String(item.name).toLowerCase(),
+          );
+          const quantity = toNumericQuantity(item.perMeal);
+          if (!food?.id || !(quantity > 0)) return null;
+          return {
+            foodId: Number(food.backendFoodId ?? food.id),
+            quantityPerMeal: quantity,
+            unit: item.unit || food.unit || "",
+            status: "Pending",
+          };
+        })
+        .filter(Boolean);
+      if (!items.length) {
+        throw new Error(`No configured food items were found for ${meal}.`);
+      }
+      const response = assertApiSuccess(
+        await kitchenOrderService.createOrder({
+          preparationDate: serviceDate,
+          mealTypeId: Number(mealTypeId),
+          plannedMeals: Number(group?.count) || 0,
+          status: "Pending",
+          remarks: "",
+          items,
+          createdBy: "admin",
+        }),
+        "kitchen order creation",
+      );
+      orderId = extractApiId(response);
+      if (orderId == null) {
+        const refreshed = assertApiSuccess(
+          await kitchenOrderService.getAllOrders({
+            preparationDate: serviceDate,
+            mealTypeId,
+            status: "",
+            paginationInfo: { currentPage: 1, pageSize: 100 },
+          }),
+          "kitchen order list",
+        );
+        orders = extractApiRows(refreshed);
+        orderId =
+          orders.find(matchesOrder)?.id ??
+          orders.find(matchesOrder)?.kitchenOrderId ??
+          null;
+        setStore("hd_kitchen_api_orders", orders);
+      }
+      if (orderId == null) {
+        throw new Error(
+          "The kitchen order was created, but the server did not return its ID.",
+        );
+      }
+    }
+
+    setStore("hd_kitchen_api_order_ids", {
+      ...cachedIds,
+      [orderKey]: orderId,
+    });
+    return orderId;
+  };
+
+  const syncKitchenOrderStatus = async (meal, status) => {
+    if (deliveryMode) return true;
+    try {
+      const orderId = await ensureKitchenOrder(meal);
+      assertApiSuccess(
+        await kitchenOrderService.updateOrderStatus(orderId, {
+          status,
+          remarks: `Moved to ${status}`,
+          updatedBy: "admin",
+        }),
+        "kitchen order status update",
+      );
+      setApiSyncError("");
+      return true;
+    } catch (error) {
+      console.error("Kitchen order update failed", error);
+      setApiSyncError(
+        error?.message || "Could not update the kitchen order on the server.",
+      );
+      return false;
+    }
+  };
+
+  const syncKitchenItemStatus = async (meal, item, status) => {
+    if (deliveryMode) return true;
+    try {
+      const orderId = await ensureKitchenOrder(meal);
+      const food = foods.find(
+        (entry) =>
+          String(entry.name).toLowerCase() ===
+          String(item.name).toLowerCase(),
+      );
+      const itemKey = `${orderId}:${
+        food?.backendFoodId ?? food?.id ?? item.name.toLowerCase()
+      }`;
+      const cachedItemIds =
+        getStore("hd_kitchen_api_item_ids", {}) || {};
+      let itemId = cachedItemIds[itemKey];
+      if (itemId == null) {
+        const response = assertApiSuccess(
+          await kitchenOrderService.getOrderById(orderId),
+          "kitchen order details",
+        );
+        const orderItem = extractApiRows(
+          response,
+          (entry) =>
+            entry.id != null &&
+            (entry.foodId != null ||
+              entry.food_id != null ||
+              entry.foodName != null ||
+              entry.itemName != null),
+        ).find(
+          (entry) =>
+            (food &&
+              String(entry.foodId ?? entry.food_id ?? "") ===
+                String(food.backendFoodId ?? food.id)) ||
+            String(entry.foodName ?? entry.itemName ?? entry.name ?? "")
+              .toLowerCase()
+              .trim() === String(item.name).toLowerCase().trim(),
+        );
+        if (!orderItem?.id) {
+          throw new Error(
+            `The server order does not contain the food item "${item.name}".`,
+          );
+        }
+        itemId = orderItem.id;
+        setStore("hd_kitchen_api_item_ids", {
+          ...cachedItemIds,
+          [itemKey]: itemId,
+        });
+      }
+      assertApiSuccess(
+        await kitchenOrderService.updateOrderItemStatus(itemId, {
+          status,
+          remarks: `Item moved to ${status}`,
+          updatedBy: "admin",
+        }),
+        "kitchen item status update",
+      );
+      setApiSyncError("");
+      return true;
+    } catch (error) {
+      console.error("Kitchen item update failed", error);
+      setApiSyncError(
+        error?.message || "Could not update the kitchen item on the server.",
+      );
+      return false;
+    }
+  };
+
+  const markMealPreparing = async (meal) => {
     let next = { ...mealStatus };
     let changed = 0;
 
@@ -623,6 +852,7 @@ export default function KitchenOperations() {
     });
 
     if (!changed) return;
+    if (!(await syncKitchenOrderStatus(meal, "Preparing"))) return;
 
     const group = preparationGroups.find((g) => g.meal === meal);
     const nextItemStatus = { ...preparationItemStatus };
@@ -647,7 +877,7 @@ export default function KitchenOperations() {
 
   // Mark the meal as Prepared only after every food item has reached Prepared.
   // IMPORTANT: this does not pack the meal.
-  const markMealPrepared = (
+  const markMealPrepared = async (
     meal,
     itemStatusOverride = preparationItemStatus,
   ) => {
@@ -679,6 +909,7 @@ export default function KitchenOperations() {
     });
 
     if (!changed) return;
+    if (!(await syncKitchenOrderStatus(meal, "Prepared"))) return;
 
     persistMealStatuses(next);
 
@@ -692,7 +923,7 @@ export default function KitchenOperations() {
   // Pack only after all aggregated food items have reached Prepared.
   // Once packed, the kitchen automatically advances to the next planned meal.
   // Pack all orders only after every food item is Prepared.
-  const markMealPacked = (meal) => {
+  const markMealPacked = async (meal) => {
     const group = preparationGroups.find((g) => g.meal === meal);
 
     if (!group?.items?.length) return;
@@ -703,6 +934,7 @@ export default function KitchenOperations() {
     );
 
     if (!allItemsPrepared) return;
+    if (!(await syncKitchenOrderStatus(meal, "Packed"))) return;
 
     // =====================================================
     // 1. Change every food item: Prepared -> Packed
@@ -781,7 +1013,7 @@ export default function KitchenOperations() {
     moveToNextPlannedMeal(meal);
   };
 
-  const resetPackedPreparationItem = (meal, item) => {
+  const resetPackedPreparationItem = async (meal, item) => {
     const key = preparationItemKey(meal, item);
     const current = getPreparationItemStatus(meal, item);
 
@@ -791,6 +1023,7 @@ export default function KitchenOperations() {
       `${item.name} is already Packed. Move it back to Prepared?`,
     );
     if (!confirmed) return;
+    if (!(await syncKitchenItemStatus(meal, item, "Prepared"))) return;
 
     const nextItemStatus = {
       ...preparationItemStatus,
@@ -830,7 +1063,14 @@ export default function KitchenOperations() {
     });
   };
 
-  const updateStatus = (patientId, meal, status) => {
+  const updateStatus = async (patientId, meal, status) => {
+    if (
+      !deliveryMode &&
+      ["Preparing", "Prepared", "Packed"].includes(status) &&
+      !(await syncKitchenOrderStatus(meal, status))
+    ) {
+      return;
+    }
     const key = `${serviceDate}-${patientId}-${meal}`;
     const previousStatus =
       mealStatus[key] || mealStatus[`${patientId}-${meal}`] || "Pending";
@@ -895,7 +1135,7 @@ export default function KitchenOperations() {
   // BULK KITCHEN ACTIONS: the header buttons operate on the selected patients
   // for the currently scheduled meal. Previously these buttons referenced
   // bulkUpdate() without defining it, so clicking them caused a runtime error.
-  const bulkUpdate = (nextStatus) => {
+  const bulkUpdate = async (nextStatus) => {
     if (!selectedPatients.size) return;
 
     const meal = mealFilter;
@@ -935,6 +1175,13 @@ export default function KitchenOperations() {
     });
 
     if (!changedPatients.length) return;
+    if (
+      !deliveryMode &&
+      ["Preparing", "Prepared", "Packed"].includes(nextStatus) &&
+      !(await syncKitchenOrderStatus(meal, nextStatus))
+    ) {
+      return;
+    }
 
     setMealStatus(next);
     setStore(MEAL_STATUS_KEY, next);
@@ -1050,6 +1297,14 @@ export default function KitchenOperations() {
 
   return (
     <AppLayout title={deliveryMode ? "Meal Delivery" : "Meal Preparation"}>
+      {apiSyncError && (
+        <div
+          className="mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="alert"
+        >
+          Kitchen server sync failed: {apiSyncError}
+        </div>
+      )}
       {!screenReady ? (
         <div className="flex items-center justify-center p-10 text-sm text-slate-500">
           Loading kitchen operations...

@@ -1,8 +1,7 @@
 /**
- * Demo authentication helpers.
- * API-ready shape: replace these LocalStorage calls with the auth service later.
+ * Demo authentication helpers. Account records stay in memory; only the active
+ * session is persisted until the authentication API is connected.
  */
-const ACCOUNTS_KEY = "hd_auth_accounts";
 const SESSION_KEY = "app_user";
 
 const DEFAULT_ACCOUNTS = [
@@ -29,17 +28,14 @@ const DEFAULT_ACCOUNTS = [
   },
 ];
 
+let accounts = DEFAULT_ACCOUNTS.map((account) => ({ ...account }));
+
 function readAccounts() {
-  try {
-    const raw = localStorage.getItem(ACCOUNTS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(DEFAULT_ACCOUNTS));
-  return [...DEFAULT_ACCOUNTS];
+  return accounts.map((account) => ({ ...account }));
 }
 
-function writeAccounts(accounts) {
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+function writeAccounts(nextAccounts) {
+  accounts = nextAccounts.map((account) => ({ ...account }));
 }
 
 function isSession(value) {
@@ -84,40 +80,15 @@ export function ensureDevAdminSession() {
 }
 
 export function seedAuthAccounts() {
-  try {
-    const existing = localStorage.getItem(ACCOUNTS_KEY);
-
-    if (!existing) {
-      writeAccounts(DEFAULT_ACCOUNTS);
-      return;
-    }
-
-    const accounts = JSON.parse(existing);
-
-    const updatedAccounts = [...accounts];
-
-    DEFAULT_ACCOUNTS.forEach((defaultAccount) => {
-      const index = updatedAccounts.findIndex(
-        (account) =>
-          String(account.email).toLowerCase() ===
-          String(defaultAccount.email).toLowerCase()
-      );
-
-      if (index === -1) {
-        // Add missing hardcoded account
-        updatedAccounts.push(defaultAccount);
-      } else {
-        // Keep user-edited account details and only add missing demo accounts.
-        updatedAccounts[index] = {
-          ...updatedAccounts[index],
-        };
-      }
-    });
-
-    writeAccounts(updatedAccounts);
-  } catch (error) {
-    console.error("Error seeding authentication accounts:", error);
-  }
+  const knownEmails = new Set(
+    accounts.map((account) => String(account.email).toLowerCase()),
+  );
+  accounts = [
+    ...accounts,
+    ...DEFAULT_ACCOUNTS.filter(
+      (account) => !knownEmails.has(String(account.email).toLowerCase()),
+    ).map((account) => ({ ...account })),
+  ];
 }
 
 export function signIn(email, password, remember = true) {

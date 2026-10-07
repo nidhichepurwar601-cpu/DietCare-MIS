@@ -9,6 +9,7 @@ import {
   addRecord,
   updateRecord,
   deleteRecord,
+  setStore,
   KEYS,
 } from "../../lib/storage.js";
 import dietTypeService from "../../services/dietTypeService.js";
@@ -266,7 +267,7 @@ export default function DietTypesTab() {
   const [isOnline, setIsOnline] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const loadStoredDietTypes = (currentPage = 1, pageSize = 10) => {
+  const loadInMemoryDietTypes = (currentPage = 1, pageSize = 10) => {
     const stored = getStore(KEYS.DIET_TYPES) || [];
     const start = (currentPage - 1) * pageSize;
     const pageData = stored.slice(start, start + pageSize);
@@ -275,8 +276,8 @@ export default function DietTypesTab() {
     setTotalItems(stored.length);
     setIsOnline(false);
 
-    console.log("OFFLINE MODE: LocalStorage data displayed.");
-    console.log("LOCAL RECORD COUNT:", stored.length);
+    console.log("OFFLINE MODE: Current-session diet types displayed.");
+    console.log("SESSION RECORD COUNT:", stored.length);
   };
 
   useEffect(() => {
@@ -347,7 +348,7 @@ export default function DietTypesTab() {
       /*
        * A successful HTTP/API response is ONLINE mode.
        * An empty backend result is valid and must NOT
-       * automatically be replaced by LocalStorage.
+       * automatically be replaced by a stale session cache.
        */
       setData(rows);
       setTotalItems(total);
@@ -355,8 +356,7 @@ export default function DietTypesTab() {
       setIsOnline(true);
 
       /*
-       * Update LocalStorage cache without destroying
-       * records cached from other backend pages.
+       * Keep the current-session cache complete across backend pages.
        */
       if (rows.length > 0) {
         const existing = getStore(KEYS.DIET_TYPES) || [];
@@ -375,16 +375,16 @@ export default function DietTypesTab() {
           }
         });
 
-        localStorage.setItem(KEYS.DIET_TYPES, JSON.stringify(merged));
+        setStore(KEYS.DIET_TYPES, merged);
 
-        console.log("LocalStorage cache updated.");
+        console.log("Current-session diet type cache updated.");
       }
 
       console.log("ONLINE MODE: Backend database data displayed.");
     } catch (error) {
-      console.warn("Backend unavailable. Using LocalStorage fallback.", error);
+      console.warn("Backend unavailable; using current-session data only.", error);
 
-      loadStoredDietTypes(currentPage, pageSize);
+      loadInMemoryDietTypes(currentPage, pageSize);
     } finally {
       setLoading(false);
     }
@@ -453,7 +453,7 @@ export default function DietTypesTab() {
       setEditing(null);
       setIsOpen(false);
       setPage(1);
-      loadStoredDietTypes(1, 10);
+      loadInMemoryDietTypes(1, 10);
     }
   };
 
@@ -530,7 +530,7 @@ export default function DietTypesTab() {
         onPageChange={(newPage) => {
           setPage(newPage);
           if (isOnline) getPaginatedDietTypesFromApi(newPage, 10, "");
-          else loadStoredDietTypes(newPage, 10);
+          else loadInMemoryDietTypes(newPage, 10);
         }}
         emptyMessage="No diet plans found"
         emptyDescription="Add a diet plan to get started."
@@ -567,11 +567,33 @@ export default function DietTypesTab() {
       <ConfirmDialog
         isOpen={!!deleting}
         onClose={() => setDeleting(null)}
-        onConfirm={() => {
-          deleteRecord(KEYS.DIET_TYPES, deleting.id);
-          setDeleting(null);
-          if (isOnline) getPaginatedDietTypesFromApi(page, 10, "");
-          else loadStoredDietTypes(page, 10);
+        onConfirm={async () => {
+          try {
+            const response = await dietTypeService.deleteType(
+              deleting.backendDietTypeId ?? deleting.id,
+            );
+            if (
+              response?.error ||
+              response?.statusCode >= 400 ||
+              response?.status >= 400
+            ) {
+              throw new Error(
+                response?.message ||
+                  response?.error?.message ||
+                  "The server rejected the diet type deletion.",
+              );
+            }
+            deleteRecord(KEYS.DIET_TYPES, deleting.id);
+            setDeleting(null);
+            if (isOnline) {
+              await getPaginatedDietTypesFromApi(page, 10, "");
+            } else {
+              loadInMemoryDietTypes(page, 10);
+            }
+          } catch (error) {
+            console.error("Diet Type deletion failed", error);
+            alert(error?.message || "Unable to delete Diet Type.");
+          }
         }}
         title="Delete Diet Plan"
         message={`Delete "${deleting?.name}"? This cannot be undone.`}

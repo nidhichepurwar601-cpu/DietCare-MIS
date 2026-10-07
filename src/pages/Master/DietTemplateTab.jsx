@@ -32,8 +32,6 @@ import dietTemplateService from "../../services/dietTemplateService.js";
 import templateItemService from "../../services/templateItemService.js";
 import foodService from "../../services/foodService.js";
 import foodNutritionService from "../../services/foodNutritionService.js";
-import mealTypeService from "../../services/mealTypeService.js";
-import dietTypeService from "../../services/dietTypeService.js";
 
 const MEAL_NAMES = [
   "Breakfast",
@@ -617,7 +615,7 @@ export default function DietTemplateTab() {
         setStore(KEYS.DIET_TEMPLATES, merged);
       }
     } catch (error) {
-      console.warn("Diet Template API unavailable; using LocalStorage.", error);
+      console.warn("Diet Template API unavailable; using current-session data only.", error);
       loadLocal(currentPage, pageSize);
     } finally {
       setLoading(false);
@@ -626,162 +624,10 @@ export default function DietTemplateTab() {
 
   useEffect(() => {
     // Backend is the source of truth whenever the application starts online.
-    // LocalStorage is used only if the API request fails.
+    // Session data is used only if the API request fails.
     loadApi(1, 10, "");
     // Initial load only. Search is submitted explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const syncMasterReferences = async () => {
-      const extract = (response) => {
-        const candidates = [];
-        const visit = (value, depth = 0) => {
-          if (!value || typeof value !== "object" || depth > 6) return;
-          if (Array.isArray(value)) {
-            const rows = value.filter(
-              (item) =>
-                item && typeof item === "object" && !Array.isArray(item),
-            );
-            if (rows.length) candidates.push(rows);
-            rows.forEach((row) => visit(row, depth + 1));
-            return;
-          }
-          Object.values(value).forEach((child) => visit(child, depth + 1));
-        };
-        visit(response);
-        return candidates.sort((a, b) => b.length - a.length)[0] || [];
-      };
-
-      try {
-        const response = await mealTypeService.getAllMealTypes({
-          code: "",
-          name: "",
-          status: null,
-          paginationInfo: {
-            currentPage: 1,
-            pageSize: 100,
-            dataSorting: {
-              byColumn: { field: "name", title: "Name", sortable: true },
-              sortingOrder: "ASC",
-            },
-          },
-        });
-        const rows = extract(response).filter(
-          (item) => item.id ?? item.mealTypeId ?? item.meal_type_id,
-        );
-        if (rows.length) {
-          const existing = getStore(KEYS.MEAL_TYPES, []) || [];
-          setStore(
-            KEYS.MEAL_TYPES,
-            rows.map((item) => {
-              const backendId = item.id ?? item.mealTypeId ?? item.meal_type_id;
-              const old = existing.find(
-                (x) =>
-                  Number(x.backendMealTypeId ?? x.id) === Number(backendId),
-              );
-              return {
-                ...old,
-                ...item,
-                id: old?.id ?? backendId,
-                backendMealTypeId: Number(backendId),
-                time:
-                  item.time ??
-                  item.scheduledTime ??
-                  item.scheduled_time ??
-                  old?.time ??
-                  "08:00",
-                status:
-                  item.status === true || item.status === 1
-                    ? "Active"
-                    : "Inactive",
-              };
-            }),
-          );
-        }
-      } catch (error) {
-        console.warn("Unable to sync Meal Types from backend.", error);
-      }
-
-      try {
-        const response = await foodService.getAllFood({
-          code: "",
-          name: "",
-          category: "",
-          status: null,
-          paginationInfo: {
-            currentPage: 1,
-            pageSize: 100,
-            dataSorting: {
-              byColumn: { field: "name", title: "Name", sortable: true },
-              sortingOrder: "ASC",
-            },
-          },
-        });
-        const rows = extract(response).filter(
-          (item) => item.id ?? item.foodId ?? item.food_id,
-        );
-        if (rows.length) {
-          const existing = getStore(KEYS.FOOD_MASTER, []) || [];
-          setStore(
-            KEYS.FOOD_MASTER,
-            rows.map((item) => {
-              const backendId = item.id ?? item.foodId ?? item.food_id;
-              const old = existing.find(
-                (x) => Number(x.backendFoodId ?? x.id) === Number(backendId),
-              );
-              return {
-                ...old,
-                ...item,
-                id: old?.id ?? backendId,
-                backendFoodId: Number(backendId),
-                unit: normalizeUnit(item.unit) || old?.unit || "piece",
-                status:
-                  item.status === true || item.status === 1
-                    ? "Active"
-                    : "Inactive",
-              };
-            }),
-          );
-        }
-      } catch (error) {
-        console.warn("Unable to sync Food Master from backend.", error);
-      }
-
-      // Diet Type is a parent reference for templates. Sync it only when the
-      // backend returns data; the existing local cache remains the fallback.
-      try {
-        const response = await dietTypeService.getAllTypes({
-          code: "",
-          name: "",
-          status: null,
-          paginationInfo: {
-            currentPage: 1,
-            pageSize: 100,
-            dataSorting: {
-              byColumn: { field: "name", title: "Name", sortable: true },
-              sortingOrder: "ASC",
-            },
-          },
-        });
-        const rows = extract(response).filter(
-          (item) => item.id ?? item.dietTypeId ?? item.diet_type_id,
-        );
-        if (rows.length) {
-          setStore(
-            KEYS.DIET_TYPES,
-            rows.map((item) => ({
-              ...item,
-              id: item.id ?? item.dietTypeId ?? item.diet_type_id,
-            })),
-          );
-        }
-      } catch (error) {
-        console.warn("Unable to sync Diet Types from backend.", error);
-      }
-    };
-
-    syncMasterReferences();
   }, []);
 
   const openEditor = (diet = null) => {
@@ -841,7 +687,7 @@ export default function DietTemplateTab() {
   };
 
   // Resolve the REAL backend FOOD.id before creating a Diet Template Item.
-  // LocalStorage seed IDs are UI IDs and are not guaranteed to match the
+  // UI IDs are not guaranteed to match the
   // backend FOOD.id (for example, Plain Curd can be local id 15 while the
   // backend id is 7). If a backend id is not already cached, first look for
   // the food in existing backend template items; if it does not exist there,
@@ -929,7 +775,7 @@ export default function DietTemplateTab() {
       );
     }
 
-    // The food is present only in LocalStorage. Create it in the backend so
+    // The food is present only in session data. Create it in the backend so
     // the subsequent Diet Template Item request cannot fail with "Food not found".
     const foodPayload = {
       code: String(food.code || food.name || "")
@@ -997,7 +843,7 @@ export default function DietTemplateTab() {
       );
     }
 
-    // Persist the backend id without replacing the LocalStorage id used by
+    // Preserve the backend id without replacing the UI id used by
     // the existing UI. This keeps the current table/mapping IDs untouched.
     try {
       const currentFoods = getStore(KEYS.FOOD_MASTER, []) || [];
@@ -1330,7 +1176,7 @@ export default function DietTemplateTab() {
 
       // The backend is authoritative after CREATE/PUT. Reload the list instead
       // of manually incrementing/replacing the frontend count. This prevents
-      // stale LocalStorage data from hiding records and guarantees that the
+      // stale session data from hiding records and guarantees that the
       // displayed total comes from the same API response as the table rows.
       const refreshed = await fetchBackendTemplates(1, 10, "");
       setData(refreshed.rows);

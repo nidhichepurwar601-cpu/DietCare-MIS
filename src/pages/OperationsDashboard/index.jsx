@@ -4,7 +4,12 @@ import {
   Users, ClipboardCheck, Clock3, ShieldAlert, UtensilsCrossed,
   Building2, ArrowRight, Activity, TrendingUp, CheckCircle2,
 } from "lucide-react";
-import { getStore, KEYS, appendHistoryEvent, getLocalDateKey } from "../../lib/storage.js";
+import {
+  getStore,
+  KEYS,
+  appendHistoryEvent,
+  getLocalDateKey,
+} from "../../lib/storage.js";
 import { buildClinicalAlerts } from "../../lib/clinicalAlerts.js";
 import HospitalPage, { HospitalCard, StatCard } from "../../components/common/HospitalPage.jsx";
 

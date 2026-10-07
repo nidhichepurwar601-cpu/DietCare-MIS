@@ -5,6 +5,8 @@ import {
   ChefHat,
   Users,
   Truck,
+  ClipboardList,
+  TriangleAlert,
 } from "lucide-react";
 import { PERMISSIONS } from "../lib/permissions.js";
 
@@ -37,6 +39,22 @@ export const NAV_ITEMS = [
     group: "OPERATIONS",
     permission: PERMISSIONS.PATIENT_VIEW,
     keywords: ["patient", "uhid", "ipd", "opd", "diet"],
+  },
+  {
+    name: "Nutrition Meal Plan",
+    to: "/diet-plans",
+    icon: ClipboardList,
+    group: "CLINICAL",
+    permission: PERMISSIONS.DIET_PLAN_VIEW,
+    keywords: ["diet", "plan", "nutrition", "assignment"],
+  },
+  {
+    name: "Clinical Alerts",
+    to: "/clinical-alerts",
+    icon: TriangleAlert,
+    group: "CLINICAL",
+    permission: PERMISSIONS.ALERTS_VIEW,
+    keywords: ["clinical", "allergy", "risk", "alert"],
   },
   {
     name: "Kitchen Operations",

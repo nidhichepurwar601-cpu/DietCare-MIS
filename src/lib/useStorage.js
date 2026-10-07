@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { getStore, setStore } from './storage.js';
 
 /**
- * Reactive LocalStorage hook.
+ * Reactive in-memory app-data hook. Persisted records are loaded from the API.
  * const [data, save, refresh] = useStorage(KEYS.PATIENTS)
  */
 export function useStorage(key, defaultValue = []) {

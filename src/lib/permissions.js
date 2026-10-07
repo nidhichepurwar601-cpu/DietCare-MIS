@@ -143,8 +143,13 @@ export function normalizeRole(role = "VIEWER") {
 
 export function getCurrentRole() {
   try {
-    const raw = sessionStorage.getItem("app_user") || localStorage.getItem("app_user");
-    return normalizeRole(JSON.parse(raw || "null")?.role || "Dietitian");
+    for (const storage of [sessionStorage, localStorage]) {
+      const raw = storage.getItem("app_user");
+      if (!raw) continue;
+      const session = JSON.parse(raw);
+      if (session?.role) return normalizeRole(session.role);
+    }
+    return normalizeRole("Dietitian");
   } catch {
     return "DIETITIAN";
   }

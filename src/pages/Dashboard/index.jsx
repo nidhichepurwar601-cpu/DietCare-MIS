@@ -30,6 +30,12 @@ import {
   normalizeDietType,
   isActiveDietType,
 } from "../../lib/dietTypeAdapter.js";
+import patientService from "../../services/patientService.js";
+import {
+  extractPatientRows,
+  normalizePatientApiRow,
+  toPatientApiPayload,
+} from "../../services/patientAdapter.js";
 import {
   Users,
   Info,
@@ -1857,7 +1863,7 @@ export default function Dashboard() {
     // Normalize them before Diet Manager consumes them.
     setDietTypes(normalizedDietTypes.filter((d) => isActiveDietType(d)));
 
-    // Keep the canonical shape in LocalStorage so all modules use the same
+    // Keep the canonical in-memory shape so all modules use the same
     // field names even when the backend is temporarily unavailable.
     if (
       normalizedDietTypes.length &&
@@ -1907,6 +1913,41 @@ export default function Dashboard() {
 
     setMappings(normalized);
   };
+
+  const reloadPatientsFromApi = async () => {
+    const response = await patientService.getAllPatients({
+      patientCode: "",
+      name: "",
+      ward: "",
+      status: true,
+      paginationInfo: { currentPage: 0, pageSize: 100 },
+    });
+    if (
+      response?.error ||
+      response?.statusCode >= 400 ||
+      response?.status >= 400
+    ) {
+      throw new Error(
+        response?.message ||
+          response?.error?.message ||
+          "Could not load patients from the server.",
+      );
+    }
+    const existingPatients = getStore(KEYS.PATIENTS, []) || [];
+    const rows = extractPatientRows(response)
+      .map(normalizePatientApiRow)
+      .filter((patient) => patient.id != null)
+      .map((patient) => ({
+        ...existingPatients.find(
+          (existing) => String(existing.id) === String(patient.id),
+        ),
+        ...patient,
+      }));
+    setStore(KEYS.PATIENTS, rows);
+    setPatients(rows);
+    return rows;
+  };
+
   useEffect(reload, []);
 
   useEffect(() => {
@@ -2047,8 +2088,16 @@ export default function Dashboard() {
     );
   };
 
-  const handleCreate = () => {
-    const newPatient = addRecord(KEYS.PATIENTS, {
+  const handleCreate = async () => {
+    if (!String(createForm.patientCode || "").trim()) {
+      window.alert("Patient Code is required.");
+      return;
+    }
+    if (!String(createForm.name || "").trim()) {
+      window.alert("Patient Name is required.");
+      return;
+    }
+    const patientData = {
       ...createForm,
       age: parseInt(createForm.age),
       dietTypeId: createForm.dietTypeId
@@ -2056,8 +2105,37 @@ export default function Dashboard() {
         : null,
       dietStatus: createForm.dietTypeId ? "Assigned" : "Not Assigned",
       dietPlanStatus: createForm.dietTypeId ? "Planning" : "Not Assigned",
-    });
-    syncDietWorkflow(newPatient);
+    };
+    try {
+      const response = await patientService.createPatient(
+        toPatientApiPayload(patientData),
+      );
+      if (
+        response?.error ||
+        response?.statusCode >= 400 ||
+        response?.status >= 400
+      ) {
+        throw new Error(
+          response?.message ||
+            response?.error?.message ||
+            "The server rejected the patient.",
+        );
+      }
+      const rows = await reloadPatientsFromApi();
+      const newPatient = rows.find(
+        (patient) =>
+          String(patient.patientCode).toLowerCase() ===
+          String(patientData.patientCode).trim().toLowerCase(),
+      );
+      if (newPatient) syncDietWorkflow(newPatient);
+    } catch (error) {
+      console.error("Patient create failed", error);
+      window.alert(
+        error?.message ||
+          "Patient could not be saved. Please check the server and try again.",
+      );
+      return;
+    }
     setIsCreateOpen(false);
     setCreateForm({ ...EMPTY_FORM });
     reload();
@@ -2081,7 +2159,7 @@ export default function Dashboard() {
         patient.pastDiet || previousDiet?.name || "No previous diet recorded",
     });
   };
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     const isFemale =
       String(editingPatient.gender || "")
         .trim()
@@ -2130,7 +2208,40 @@ export default function Dashboard() {
             prescriptionInstructions: "",
           }),
     };
+    try {
+      const response = await patientService.updatePatientById(
+        editingPatient.id,
+        toPatientApiPayload(updatedPatient, { isUpdate: true }),
+      );
+      if (
+        response?.error ||
+        response?.statusCode >= 400 ||
+        response?.status >= 400
+      ) {
+        throw new Error(
+          response?.message ||
+            response?.error?.message ||
+            "The server rejected the patient update.",
+        );
+      }
+    } catch (error) {
+      console.error("Patient update failed", error);
+      window.alert(
+        error?.message ||
+          "Patient could not be updated. Please check the server and try again.",
+      );
+      return;
+    }
     updateRecord(KEYS.PATIENTS, editingPatient.id, updatedPatient);
+    try {
+      await reloadPatientsFromApi();
+    } catch (error) {
+      console.error("Patient refresh after update failed", error);
+      window.alert(
+        error?.message ||
+          "Patient was updated, but the patient list could not be refreshed.",
+      );
+    }
     const trackedPatientFields = [
       "allergens",
       "specialInstructions",
@@ -2200,10 +2311,30 @@ export default function Dashboard() {
     reload();
   };
 
-  const handleDelete = () => {
-    deleteRecord(KEYS.PATIENTS, deletingPatient.id);
-    setDeletingPatient(null);
-    reload();
+  const handleDelete = async () => {
+    try {
+      const response = await patientService.deletePatient(deletingPatient.id);
+      if (
+        response?.error ||
+        response?.statusCode >= 400 ||
+        response?.status >= 400
+      ) {
+        throw new Error(
+          response?.message ||
+            response?.error?.message ||
+            "The server rejected the patient deletion.",
+        );
+      }
+      deleteRecord(KEYS.PATIENTS, deletingPatient.id);
+      setDeletingPatient(null);
+      reload();
+    } catch (error) {
+      console.error("Patient delete failed", error);
+      window.alert(
+        error?.message ||
+          "Patient could not be deleted. Please check the server and try again.",
+      );
+    }
   };
 
   const filtered = patients.filter((p) => {
