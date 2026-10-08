@@ -9,7 +9,6 @@ import {
   addRecord,
   updateRecord,
   deleteRecord,
-  setStore,
   KEYS,
 } from "../../lib/storage.js";
 import dietTypeService from "../../services/dietTypeService.js";
@@ -267,7 +266,7 @@ export default function DietTypesTab() {
   const [isOnline, setIsOnline] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const loadInMemoryDietTypes = (currentPage = 1, pageSize = 10) => {
+  const loadStoredDietTypes = (currentPage = 1, pageSize = 10) => {
     const stored = getStore(KEYS.DIET_TYPES) || [];
     const start = (currentPage - 1) * pageSize;
     const pageData = stored.slice(start, start + pageSize);
@@ -276,8 +275,8 @@ export default function DietTypesTab() {
     setTotalItems(stored.length);
     setIsOnline(false);
 
-    console.log("OFFLINE MODE: Current-session diet types displayed.");
-    console.log("SESSION RECORD COUNT:", stored.length);
+    console.log("OFFLINE MODE: LocalStorage data displayed.");
+    console.log("LOCAL RECORD COUNT:", stored.length);
   };
 
   useEffect(() => {
@@ -348,7 +347,7 @@ export default function DietTypesTab() {
       /*
        * A successful HTTP/API response is ONLINE mode.
        * An empty backend result is valid and must NOT
-       * automatically be replaced by a stale session cache.
+       * automatically be replaced by LocalStorage.
        */
       setData(rows);
       setTotalItems(total);
@@ -356,7 +355,8 @@ export default function DietTypesTab() {
       setIsOnline(true);
 
       /*
-       * Keep the current-session cache complete across backend pages.
+       * Update LocalStorage cache without destroying
+       * records cached from other backend pages.
        */
       if (rows.length > 0) {
         const existing = getStore(KEYS.DIET_TYPES) || [];
@@ -375,16 +375,16 @@ export default function DietTypesTab() {
           }
         });
 
-        setStore(KEYS.DIET_TYPES, merged);
+        localStorage.setItem(KEYS.DIET_TYPES, JSON.stringify(merged));
 
-        console.log("Current-session diet type cache updated.");
+        console.log("LocalStorage cache updated.");
       }
 
       console.log("ONLINE MODE: Backend database data displayed.");
     } catch (error) {
-      console.warn("Backend unavailable; using current-session data only.", error);
+      console.warn("Backend unavailable. Using LocalStorage fallback.", error);
 
-      loadInMemoryDietTypes(currentPage, pageSize);
+      loadStoredDietTypes(currentPage, pageSize);
     } finally {
       setLoading(false);
     }
@@ -403,7 +403,11 @@ export default function DietTypesTab() {
     };
 
     const payload = editing?.id
-      ? { ...commonPayload, createdBy: form.createdBy || "Admin", updatedBy: "Admin" }
+      ? {
+          ...commonPayload,
+          createdBy: form.createdBy || "Admin",
+          updatedBy: "Admin",
+        }
       : { ...commonPayload, createdBy: form.createdBy || "Admin" };
 
     if (!payload.name || !payload.code) {
@@ -453,7 +457,7 @@ export default function DietTypesTab() {
       setEditing(null);
       setIsOpen(false);
       setPage(1);
-      loadInMemoryDietTypes(1, 10);
+      loadStoredDietTypes(1, 10);
     }
   };
 
@@ -465,12 +469,12 @@ export default function DietTypesTab() {
       key: "targetCalories",
       label: "Targets",
       render: (r) => (
-        <div>
-          <div style={{ fontWeight: 600, fontSize: "var(--font-body)", color: "var(--text-primary)" }}>
+        <div className="text-xs">
+          <div className="font-medium text-gray-900">
             {r.targetCalories} kcal
           </div>
-          <div style={{ fontSize: "var(--font-caption)", color: "var(--text-secondary)" }}>
-            P:{r.proteinPercent}% · C:{r.carbsPercent}% · F:{r.fatPercent}%
+          <div className="text-gray-400">
+            P:{r.proteinPercent}% C:{r.carbsPercent}% F:{r.fatPercent}%
           </div>
         </div>
       ),
@@ -479,6 +483,7 @@ export default function DietTypesTab() {
       key: "status",
       label: "Status",
       render: (r) => {
+        // StatusBadge expects a display status, not a boolean.
         const isActive = normalizeStatus(r.status, true);
         return <StatusBadge status={isActive ? "Active" : "Inactive"} />;
       },
@@ -488,36 +493,56 @@ export default function DietTypesTab() {
       label: "",
       sortable: false,
       render: (r) => (
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
-          <button type="button" onClick={() => openModal(r)} className="icon-btn" title="Edit" style={{ minWidth: 32, minHeight: 32 }}>
-            <Edit size={15} style={{ color: "var(--color-info)" }} />
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={() => openModal(r)}
+            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+          >
+            <Edit className="w-4 h-4" />
           </button>
-          <button type="button" onClick={() => setDeleting(r)} className="icon-btn" title="Delete" style={{ minWidth: 32, minHeight: 32 }}>
-            <Trash2 size={15} style={{ color: "var(--color-error)" }} />
+          <button
+            onClick={() => setDeleting(r)}
+            className="p-1.5 text-red-600  hover:bg-red-50  rounded"
+          >
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       ),
     },
   ];
 
-  const modalFooter = (
-    <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-3)" }}>
-      <button type="button" onClick={() => setIsOpen(false)} className="hospital-button hospital-button-secondary">Cancel</button>
-      <button type="button" onClick={save} className="hospital-button">Save</button>
+  const footer = (
+    <div className="flex justify-end gap-2">
+      <button
+        onClick={() => setIsOpen(false)}
+        className="px-4 py-2 text-sm border rounded-md hover:bg-gray-50"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={save}
+        className="px-4 py-2 text-sm bg-blue-700 text-white rounded-md hover:bg-blue-800"
+      >
+        Save
+      </button>
     </div>
   );
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-4)" }}>
-        <div>
-          <h2 style={{ fontSize: "var(--font-h3)", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>Diet Plans</h2>
-          {loading && <span style={{ fontSize: "var(--font-caption)", color: "var(--text-secondary)" }}>Loading…</span>}
-        </div>
-        <button type="button" onClick={() => openModal()} className="hospital-button hospital-button-sm">
-          <Plus size={14} /> Add Diet Plan
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-base font-semibold text-gray-800">Diet Plans</h2>
+        <button
+          onClick={() => openModal()}
+          className="flex items-center gap-1 px-3 py-1.5 bg-blue-700 text-white rounded-md text-sm hover:bg-blue-800"
+        >
+          <Plus className="w-4 h-4" /> Add Diet Plan
         </button>
       </div>
+
+      {loading && (
+        <div className="mb-2 text-xs text-gray-500">Loading diet plans...</div>
+      )}
 
       <DataTable
         columns={columns}
@@ -529,34 +554,76 @@ export default function DietTypesTab() {
         totalItems={totalItems}
         onPageChange={(newPage) => {
           setPage(newPage);
-          if (isOnline) getPaginatedDietTypesFromApi(newPage, 10, "");
-          else loadInMemoryDietTypes(newPage, 10);
+
+          if (isOnline) {
+            getPaginatedDietTypesFromApi(newPage, 10, "");
+          } else {
+            loadStoredDietTypes(newPage, 10);
+          }
         }}
-        emptyMessage="No diet plans found"
-        emptyDescription="Add a diet plan to get started."
       />
 
-      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={editing ? "Edit Diet Plan" : "Add Diet Plan"} footer={modalFooter}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
-          {[["Name", "name"], ["Code", "code"]].map(([l, k]) => (
+      <Modal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        title={editing ? "Edit Diet Plan" : "Add Diet Plan"}
+        footer={footer}
+      >
+        <div className="grid grid-cols-2 gap-4">
+          {[
+            ["Name", "name"],
+            ["Code", "code"],
+          ].map(([l, k]) => (
             <div key={k}>
-              <label className="hospital-label" style={{ display: "block", marginBottom: "var(--space-1)" }}>{l}</label>
-              <input className="hospital-input" value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
+              <label className="block text-xs font-medium mb-1">{l}</label>
+              <input
+                className="w-full px-3 py-2 border rounded-md text-sm"
+                value={form[k]}
+                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+              />
             </div>
           ))}
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label className="hospital-label" style={{ display: "block", marginBottom: "var(--space-1)" }}>Description</label>
-            <textarea className="hospital-textarea" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <div className="col-span-2">
+            <label className="block text-xs font-medium mb-1">
+              Description
+            </label>
+            <textarea
+              className="w-full px-3 py-2 border rounded-md text-sm"
+              rows="2"
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+            />
           </div>
-          {[["Target Calories (kcal)", "targetCalories"], ["Protein %", "proteinPercent"], ["Carbs %", "carbsPercent"], ["Fat %", "fatPercent"]].map(([l, k]) => (
+          {[
+            ["Target Calories (kcal)", "targetCalories"],
+            ["Protein %", "proteinPercent"],
+            ["Carbs %", "carbsPercent"],
+            ["Fat %", "fatPercent"],
+          ].map(([l, k]) => (
             <div key={k}>
-              <label className="hospital-label" style={{ display: "block", marginBottom: "var(--space-1)" }}>{l}</label>
-              <input type="number" className="hospital-input" value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
+              <label className="block text-xs font-medium mb-1">{l}</label>
+              <input
+                type="number"
+                className="w-full px-3 py-2 border rounded-md text-sm"
+                value={form[k]}
+                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+              />
             </div>
           ))}
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label className="hospital-label" style={{ display: "block", marginBottom: "var(--space-1)" }}>Status</label>
-            <select className="hospital-select" value={form.status ? "true" : "false"} onChange={(e) => setForm({ ...form, status: e.target.value === "true" })}>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium mb-1">Status</label>
+            <select
+              className="w-full px-3 py-2 border rounded-md text-sm"
+              value={form.status ? "true" : "false"}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  status: e.target.value === "true",
+                })
+              }
+            >
               <option value="true">Active</option>
               <option value="false">Inactive</option>
             </select>
@@ -567,36 +634,18 @@ export default function DietTypesTab() {
       <ConfirmDialog
         isOpen={!!deleting}
         onClose={() => setDeleting(null)}
-        onConfirm={async () => {
-          try {
-            const response = await dietTypeService.deleteType(
-              deleting.backendDietTypeId ?? deleting.id,
-            );
-            if (
-              response?.error ||
-              response?.statusCode >= 400 ||
-              response?.status >= 400
-            ) {
-              throw new Error(
-                response?.message ||
-                  response?.error?.message ||
-                  "The server rejected the diet type deletion.",
-              );
-            }
-            deleteRecord(KEYS.DIET_TYPES, deleting.id);
-            setDeleting(null);
-            if (isOnline) {
-              await getPaginatedDietTypesFromApi(page, 10, "");
-            } else {
-              loadInMemoryDietTypes(page, 10);
-            }
-          } catch (error) {
-            console.error("Diet Type deletion failed", error);
-            alert(error?.message || "Unable to delete Diet Type.");
+        onConfirm={() => {
+          deleteRecord(KEYS.DIET_TYPES, deleting.id);
+          setDeleting(null);
+
+          if (isOnline) {
+            getPaginatedDietTypesFromApi(page, 10, "");
+          } else {
+            loadStoredDietTypes(page, 10);
           }
         }}
         title="Delete Diet Plan"
-        message={`Delete "${deleting?.name}"? This cannot be undone.`}
+        message={`Delete "${deleting?.name}"?`}
       />
     </div>
   );

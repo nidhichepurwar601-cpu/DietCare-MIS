@@ -8,7 +8,12 @@ import {
   Eye,
   Download,
 } from "lucide-react";
-import { getStore, setStore, KEYS, getLocalDateKey } from "../../lib/storage.js";
+import {
+  getStore,
+  setStore,
+  KEYS,
+  getLocalDateKey,
+} from "../../lib/storage.js";
 import { buildClinicalAlerts } from "../../lib/clinicalAlerts.js";
 import {
   Modal,
@@ -33,7 +38,10 @@ export default function ClinicalAlerts({ embedded = false } = {}) {
     const refresh = () => setStoreVersion((version) => version + 1);
     window.addEventListener("dietcare-store-updated", refresh);
     window.addEventListener("storage", refresh);
-    return () => { window.removeEventListener("dietcare-store-updated", refresh); window.removeEventListener("storage", refresh); };
+    return () => {
+      window.removeEventListener("dietcare-store-updated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, []);
   const patients = getStore(KEYS.PATIENTS, []);
   const plans = getStore("hd_diet_plans", []);
@@ -43,10 +51,23 @@ export default function ClinicalAlerts({ embedded = false } = {}) {
   const alerts = useMemo(
     () =>
       patients.flatMap((patient) => {
-        const plan = plans.find((p) => String(p.patientId) === String(patient.id) && String(p.status).toLowerCase() === "approved") || plans.find((p) => String(p.patientId) === String(patient.id));
-        const workflow = workflows.find((f) => String(f.patientId) === String(patient.id));
+        const plan =
+          plans.find(
+            (p) =>
+              String(p.patientId) === String(patient.id) &&
+              String(p.status).toLowerCase() === "approved",
+          ) || plans.find((p) => String(p.patientId) === String(patient.id));
+        const workflow = workflows.find(
+          (f) => String(f.patientId) === String(patient.id),
+        );
         const intake = getStore(`hd_meal_intake_${patient.id}_${today}`, null);
-        return buildClinicalAlerts({ patient, plan, workflow, intake, mealStatus }).map((alert) => ({ ...alert, patient }));
+        return buildClinicalAlerts({
+          patient,
+          plan,
+          workflow,
+          intake,
+          mealStatus,
+        }).map((alert) => ({ ...alert, patient }));
       }),
     [patients, plans, workflows, mealStatus, today, storeVersion],
   );
@@ -81,46 +102,138 @@ export default function ClinicalAlerts({ embedded = false } = {}) {
               <p className="hospital-stat-label">Total Alerts</p>
               <p className="hospital-stat-value">{alerts.length}</p>
             </div>
-            <div className="hospital-stat-icon"><ShieldAlert size={20} /></div>
+            <div className="hospital-stat-icon">
+              <ShieldAlert size={20} />
+            </div>
           </div>
-          <div className="hospital-stat-card" style={{ "--stat-icon-color": "var(--color-error)" }}>
+          <div
+            className="hospital-stat-card"
+            style={{ "--stat-icon-color": "var(--color-error)" }}
+          >
             <div>
               <p className="hospital-stat-label">High Priority</p>
-              <p className="hospital-stat-value" style={{ color: high > 0 ? "var(--color-error)" : undefined }}>{high}</p>
+              <p
+                className="hospital-stat-value"
+                style={{ color: high > 0 ? "var(--color-error)" : undefined }}
+              >
+                {high}
+              </p>
             </div>
-            <div className="hospital-stat-icon" style={{ background: "var(--color-error-soft)", color: "var(--color-error)" }}><AlertTriangle size={20} /></div>
+            <div
+              className="hospital-stat-icon"
+              style={{
+                background: "var(--color-error-soft)",
+                color: "var(--color-error)",
+              }}
+            >
+              <AlertTriangle size={20} />
+            </div>
           </div>
           <div className="hospital-stat-card">
             <div>
               <p className="hospital-stat-label">Acknowledged</p>
-              <p className="hospital-stat-value" style={{ color: "var(--color-success)" }}>{ack.length}</p>
+              <p
+                className="hospital-stat-value"
+                style={{ color: "var(--color-success)" }}
+              >
+                {ack.length}
+              </p>
             </div>
-            <div className="hospital-stat-icon" style={{ background: "var(--color-success-soft)", color: "var(--color-success)" }}><CheckCircle size={20} /></div>
+            <div
+              className="hospital-stat-icon"
+              style={{
+                background: "var(--color-success-soft)",
+                color: "var(--color-success)",
+              }}
+            >
+              <CheckCircle size={20} />
+            </div>
           </div>
         </section>
 
         {/* ── Alerts table ───────────────────────────────────── */}
         <section className="hospital-card">
-          <div className="hospital-card-header">
+          <div
+            className="hospital-card-header"
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
             <div>
               <h3 className="hospital-card-title">Active Clinical Alerts</h3>
-              <p className="hospital-card-subtitle">Patient dietary safety information.</p>
+              <p className="hospital-card-subtitle">
+                Patient dietary safety information.
+              </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="relative">
-                <Search size={14} className="absolute left-[10px] top-1/2 -translate-y-1/2 text-secondary pointer-events-none" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} className="hospital-input pl-8 w-[220px]" placeholder="Search patient, ID or alert" />
-              </div>
-              <select value={severity} onChange={(e) => setSeverity(e.target.value)} className="hospital-select w-auto">
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="hospital-input"
+                style={{ width: 240 }}
+                placeholder="Search patient, ID or alert"
+              />
+
+              <select
+                value={severity}
+                onChange={(e) => setSeverity(e.target.value)}
+                className="hospital-select"
+                style={{ width: 130 }}
+              >
                 <option>All</option>
                 <option>High</option>
                 <option>Medium</option>
               </select>
-              <label className="inline-flex items-center gap-2 text-caption text-secondary cursor-pointer px-2">
-                <input type="checkbox" checked={showAcknowledged} onChange={(e) => setShowAcknowledged(e.target.checked)} />
+
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  whiteSpace: "nowrap",
+                  cursor: "pointer",
+                  fontSize: "var(--font-caption)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={showAcknowledged}
+                  onChange={(e) => setShowAcknowledged(e.target.checked)}
+                />
                 Show acknowledged
               </label>
-              <button onClick={() => exportCsv("clinical-alerts.csv", rows.map((a) => ({ Priority: a.severity, Type: a.type, Patient: a.patient.name, ID: a.patient.id, Ward: a.patient.ward, Information: a.message, Acknowledged: ack.includes(a.id) ? "Yes" : "No" })))} className="hospital-button hospital-button-secondary hospital-button-sm">
+
+              <button
+                onClick={() =>
+                  exportCsv(
+                    "clinical-alerts.csv",
+                    rows.map((a) => ({
+                      Priority: a.severity,
+                      Type: a.type,
+                      Patient: a.patient.name,
+                      ID: a.patient.id,
+                      Ward: a.patient.ward,
+                      Information: a.message,
+                      Acknowledged: ack.includes(a.id) ? "Yes" : "No",
+                    })),
+                  )
+                }
+                className="hospital-button hospital-button-secondary hospital-button-sm"
+                style={{ whiteSpace: "nowrap" }}
+              >
                 <Download size={14} /> Export
               </button>
             </div>
@@ -131,7 +244,9 @@ export default function ClinicalAlerts({ embedded = false } = {}) {
                 key: "priority",
                 label: "Priority",
                 render: (a) => (
-                  <span className={`hospital-status ${a.severity === "High" ? "hospital-status-danger" : "hospital-status-pending"}`}>
+                  <span
+                    className={`hospital-status ${a.severity === "High" ? "hospital-status-danger" : "hospital-status-pending"}`}
+                  >
                     {a.severity}
                   </span>
                 ),
@@ -139,27 +254,42 @@ export default function ClinicalAlerts({ embedded = false } = {}) {
               {
                 key: "type",
                 label: "Alert Type",
-                render: (a) => <div className="font-semibold text-body text-primary">{a.type}</div>,
+                render: (a) => (
+                  <div className="font-semibold text-body text-primary">
+                    {a.type}
+                  </div>
+                ),
               },
               {
                 key: "patient",
                 label: "Patient",
                 render: (a) => (
                   <div>
-                    <div className="font-semibold text-body text-primary">{a.patient.name}</div>
-                    <div className="text-caption text-secondary">ID: {a.patient.id}</div>
+                    <div className="font-semibold text-body text-primary">
+                      {a.patient.name}
+                    </div>
+                    <div className="text-caption text-secondary">
+                      ID: {a.patient.id}
+                    </div>
                   </div>
                 ),
               },
               {
                 key: "wardBed",
                 label: "Ward / Bed",
-                render: (a) => <div className="text-body text-secondary">{a.patient.ward || "—"} / {a.patient.bedNo || a.patient.bed || "—"}</div>,
+                render: (a) => (
+                  <div className="text-body text-secondary">
+                    {a.patient.ward || "—"} /{" "}
+                    {a.patient.bedNo || a.patient.bed || "—"}
+                  </div>
+                ),
               },
               {
                 key: "info",
                 label: "Clinical Information",
-                render: (a) => <div className="text-body text-primary">{a.message}</div>,
+                render: (a) => (
+                  <div className="text-body text-primary">{a.message}</div>
+                ),
               },
               {
                 key: "actions",
@@ -168,7 +298,12 @@ export default function ClinicalAlerts({ embedded = false } = {}) {
                 className: "text-right",
                 render: (a) => (
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => setSelected(a)} className="icon-btn min-w-[30px] min-h-[30px]"><Eye size={14} /></button>
+                    <button
+                      onClick={() => setSelected(a)}
+                      className="icon-btn min-w-[30px] min-h-[30px]"
+                    >
+                      <Eye size={14} />
+                    </button>
                     <button
                       onClick={() => toggle(a)}
                       className={`hospital-button hospital-button-sm ${ack.includes(a.id) ? "hospital-button-secondary" : "hospital-button-outline-primary"}`}
@@ -188,14 +323,42 @@ export default function ClinicalAlerts({ embedded = false } = {}) {
       </div>
       {selected && (
         <Modal title="Clinical Alert Details" onClose={() => setSelected(null)}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", fontSize: "var(--font-body)", color: "var(--text-primary)" }}>
-            <div><strong>Patient:</strong> {selected.patient.name} (ID: {selected.patient.id})</div>
-            <div><strong>Alert:</strong> {selected.type}</div>
-            <div><strong>Priority:</strong> {selected.severity}</div>
-            <div><strong>Ward / Bed:</strong> {selected.patient.ward} / {selected.patient.bedNo || selected.patient.bed}</div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-3)",
+              fontSize: "var(--font-body)",
+              color: "var(--text-primary)",
+            }}
+          >
+            <div>
+              <strong>Patient:</strong> {selected.patient.name} (ID:{" "}
+              {selected.patient.id})
+            </div>
+            <div>
+              <strong>Alert:</strong> {selected.type}
+            </div>
+            <div>
+              <strong>Priority:</strong> {selected.severity}
+            </div>
+            <div>
+              <strong>Ward / Bed:</strong> {selected.patient.ward} /{" "}
+              {selected.patient.bedNo || selected.patient.bed}
+            </div>
             <div>
               <strong>Clinical Information:</strong>
-              <p style={{ marginTop: "var(--space-2)", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", padding: "var(--space-3)", color: "var(--text-secondary)" }}>{selected.message}</p>
+              <p
+                style={{
+                  marginTop: "var(--space-2)",
+                  background: "var(--bg-secondary)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "var(--space-3)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                {selected.message}
+              </p>
             </div>
           </div>
         </Modal>

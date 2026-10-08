@@ -3,10 +3,10 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 const SIZE_MAP = {
-  sm:  "max-w-md",
-  md:  "max-w-lg",
-  lg:  "max-w-2xl",
-  xl:  "max-w-4xl",
+  sm: "max-w-md",
+  md: "max-w-lg",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
   "2xl": "max-w-5xl",
   "3xl": "max-w-6xl",
   "4xl": "max-w-7xl",
@@ -24,22 +24,38 @@ export default function Modal({
   className = "",
 }) {
   const dialogRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  const preventCloseRef = useRef(preventClose);
+
+  // Always keep the latest values without re-running the main effect
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    preventCloseRef.current = preventClose;
+  });
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const handle = (e) => {
-      if (e.key === "Escape" && !preventClose) onClose();
+      if (e.key === "Escape" && !preventCloseRef.current) onCloseRef.current();
     };
-    if (isOpen) {
-      document.addEventListener("keydown", handle);
-      document.body.style.overflow = "hidden";
-      // Focus trap: move focus into dialog
-      setTimeout(() => dialogRef.current?.focus(), 10);
-    }
+
+    document.addEventListener("keydown", handle);
+    document.body.style.overflow = "hidden";
+
+    // Focus the dialog only if focus isn't already inside it
+    const t = setTimeout(() => {
+      if (!dialogRef.current?.contains(document.activeElement)) {
+        dialogRef.current?.focus();
+      }
+    }, 10);
+
     return () => {
+      clearTimeout(t);
       document.removeEventListener("keydown", handle);
       document.body.style.overflow = "";
     };
-  }, [isOpen, onClose, preventClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

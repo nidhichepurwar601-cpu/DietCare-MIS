@@ -168,35 +168,82 @@ function ReportFilters({ filters, onChange, onGenerate, onClear, dietTypes }) {
     <div className="hospital-filter-panel reports-filter-panel">
       <div className="hospital-field" style={{ flex: "1 1 160px" }}>
         <label className="hospital-label">Report Type</label>
-        <select className="hospital-select" value={filters.reportType} onChange={(e) => onChange("reportType", e.target.value)}>
-          {REPORT_TYPES.map((r) => <option key={r}>{r}</option>)}
+        <select
+          className="hospital-select"
+          value={filters.reportType}
+          onChange={(e) => onChange("reportType", e.target.value)}
+        >
+          {REPORT_TYPES.map((r) => (
+            <option key={r}>{r}</option>
+          ))}
         </select>
       </div>
       <div className="hospital-field" style={{ flex: "0 1 150px" }}>
         <label className="hospital-label">From</label>
-        <input type="date" className="hospital-input" value={filters.fromDate} onChange={(e) => onChange("fromDate", e.target.value)} />
+        <input
+          type="date"
+          className="hospital-input"
+          value={filters.fromDate}
+          onChange={(e) => onChange("fromDate", e.target.value)}
+        />
       </div>
       <div className="hospital-field" style={{ flex: "0 1 150px" }}>
         <label className="hospital-label">To</label>
-        <input type="date" className="hospital-input" value={filters.toDate} onChange={(e) => onChange("toDate", e.target.value)} />
+        <input
+          type="date"
+          className="hospital-input"
+          value={filters.toDate}
+          onChange={(e) => onChange("toDate", e.target.value)}
+        />
       </div>
       <div className="hospital-field" style={{ flex: "0 1 150px" }}>
         <label className="hospital-label">Ward</label>
-        <select className="hospital-select" value={filters.ward} onChange={(e) => onChange("ward", e.target.value)}>
+        <select
+          className="hospital-select"
+          value={filters.ward}
+          onChange={(e) => onChange("ward", e.target.value)}
+        >
           <option value="">All Wards</option>
-          {WARDS.map((w) => <option key={w}>{w}</option>)}
+          {WARDS.map((w) => (
+            <option key={w}>{w}</option>
+          ))}
         </select>
       </div>
       <div className="hospital-field" style={{ flex: "1 1 150px" }}>
         <label className="hospital-label">Diet Plan</label>
-        <select className="hospital-select" value={filters.dietType} onChange={(e) => onChange("dietType", e.target.value)}>
+        <select
+          className="hospital-select"
+          value={filters.dietType}
+          onChange={(e) => onChange("dietType", e.target.value)}
+        >
           <option value="">All Diet Plans</option>
-          {dietTypes.filter((d) => d.status === "Active").map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          {dietTypes
+            .filter((d) => d.status === "Active")
+            .map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
         </select>
       </div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-2)", flexShrink: 0 }}>
-        <button type="button" onClick={onGenerate} className="hospital-button">Search</button>
-        <button type="button" onClick={onClear} className="hospital-button hospital-button-secondary">Clear</button>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: "var(--space-2)",
+          flexShrink: 0,
+        }}
+      >
+        <button type="button" onClick={onGenerate} className="hospital-button">
+          Search
+        </button>
+        <button
+          type="button"
+          onClick={onClear}
+          className="hospital-button hospital-button-secondary"
+        >
+          Clear
+        </button>
       </div>
     </div>
   );
@@ -238,6 +285,13 @@ function ReportTable({ data, type }) {
           render: (r) => <span className="text-xs">{r.foodItems}</span>,
         },
         { key: "totalCalories", label: "Total Calories" },
+      ],
+      "Kitchen Preparation Report": [
+        { key: "mealType", label: "Meal" },
+        { key: "foodItem", label: "Food Item" },
+        { key: "totalQuantity", label: "Total Quantity" },
+        { key: "uom", label: "UOM" },
+        { key: "patients", label: "Patients" },
       ],
       "Activity History": [
         { key: "date", label: "Date / Time" },
@@ -359,18 +413,18 @@ export default function Reports() {
   const [screenError, setScreenError] = useState("");
 
   useEffect(() => {
-    const rawPatients = getStore(KEYS.PATIENTS);
+    const rawPatients = getStore(KEYS.PATIENTS, []) || [];
     const pts = rawPatients.map((p) => ({
       ...p,
       dietTypeId: p.dietTypeId ? Number(p.dietTypeId) : null,
     }));
 
-    const rawFoods = getStore(KEYS.FOOD_MASTER);
-    const rawMappings = getStore(KEYS.DIET_MAPPING);
+    const rawFoods = getStore(KEYS.FOOD_MASTER, []) || [];
+    const rawMappings = getStore(KEYS.DIET_MAPPING, []) || [];
 
     setPatients(pts);
-    setDietTypes(getStore(KEYS.DIET_TYPES));
-    setMealTypes(getStore(KEYS.MEAL_TYPES));
+    setDietTypes(getStore(KEYS.DIET_TYPES, []) || []);
+    setMealTypes(getStore(KEYS.MEAL_TYPES, []) || []);
     setFoods(rawFoods.map((f) => ({ ...f, id: Number(f.id) })));
     setMappings(
       rawMappings.map((m) => ({
@@ -386,7 +440,7 @@ export default function Reports() {
     if (pts.length) {
       const dates = pts
         .map((p) => new Date(p.admissionDate))
-        .filter((d) => !Number.isNaN(d));
+        .filter((d) => !Number.isNaN(d.getTime()));
       if (dates.length) {
         const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
         const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
@@ -705,7 +759,13 @@ export default function Reports() {
       >
         <div className="reports-content">
           <div className="report-filters">
-            <ReportFilters filters={filters} onChange={(k, v) => setFilters((p) => ({ ...p, [k]: v }))} onGenerate={generate} onClear={clearFilters} dietTypes={dietTypes} />
+            <ReportFilters
+              filters={filters}
+              onChange={(k, v) => setFilters((p) => ({ ...p, [k]: v }))}
+              onGenerate={generate}
+              onClear={clearFilters}
+              dietTypes={dietTypes}
+            />
           </div>
 
           <div className="reports-summary">
@@ -714,11 +774,22 @@ export default function Reports() {
 
           <div className="report-controls">
             <span className="reports-count">
-              Found {reportData.length} {reportData.length === 1 ? "record" : "records"}
+              Found {reportData.length}{" "}
+              {reportData.length === 1 ? "record" : "records"}
             </span>
             <div className="reports-actions">
-              <button onClick={exportCSV} className="hospital-button hospital-button-secondary hospital-button-sm">Export CSV</button>
-              <button onClick={printReport} className="hospital-button hospital-button-sm">Print</button>
+              <button
+                onClick={exportCSV}
+                className="hospital-button hospital-button-secondary hospital-button-sm"
+              >
+                Export CSV
+              </button>
+              <button
+                onClick={printReport}
+                className="hospital-button hospital-button-sm"
+              >
+                Print
+              </button>
             </div>
           </div>
 
@@ -732,7 +803,14 @@ export default function Reports() {
               <div className="hospital-card-body">
                 <div className="hospital-alert hospital-alert-error">
                   {screenError}
-                  <button type="button" onClick={generate} className="hospital-button hospital-button-danger hospital-button-sm" style={{ marginLeft: "var(--space-3)" }}>Retry</button>
+                  <button
+                    type="button"
+                    onClick={generate}
+                    className="hospital-button hospital-button-danger hospital-button-sm"
+                    style={{ marginLeft: "var(--space-3)" }}
+                  >
+                    Retry
+                  </button>
                 </div>
               </div>
             ) : !reportData.length ? (
@@ -741,7 +819,10 @@ export default function Reports() {
                   <Filter size={22} />
                 </div>
                 <h3>No report records found</h3>
-                <p>Try a wider date range, another ward, or a different report type.</p>
+                <p>
+                  Try a wider date range, another ward, or a different report
+                  type.
+                </p>
               </div>
             ) : (
               <ReportTable data={reportData} type={filters.reportType} />

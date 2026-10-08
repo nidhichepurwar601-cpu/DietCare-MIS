@@ -20,6 +20,7 @@ import {
   updateRecord,
   deleteRecord,
   KEYS,
+  STANDARD_UNITS,
   normalizeUnit,
   positiveQuantity,
   resolveQuantity,
@@ -34,6 +35,7 @@ import foodService from "../../services/foodService.js";
 import foodNutritionService from "../../services/foodNutritionService.js";
 import { loadTemplateMappings } from "../../lib/masterData.js";
 
+
 const MEAL_NAMES = [
   "Breakfast",
   "Mid-Morning",
@@ -43,11 +45,11 @@ const MEAL_NAMES = [
   "Bedtime",
 ];
 
-const MEAL_FOOD_UNITS = ["piece", "glass"];
+
 
 function normalizeMealFoodUnit(unit) {
   const normalized = normalizeUnit(unit);
-  return MEAL_FOOD_UNITS.includes(normalized) ? normalized : "piece";
+  return STANDARD_UNITS.includes(normalized) ? normalized : STANDARD_UNITS[0];
 }
 
 const EMPTY = {
@@ -206,7 +208,6 @@ function extractTotal(response, fallback) {
 
   return fallback;
 }
-
 function numericQuantity(value) {
   const direct = Number(value);
   if (Number.isFinite(direct) && direct > 0) return direct;
@@ -221,27 +222,15 @@ function foodNutrition(food, quantity, unit) {
     return { calories: 0, protein: 0, carbs: 0, fat: 0 };
   }
 
-  // Diet Template quantities use ONLY these two units:
-  // 1. piece
-  // 2. glass
-  //
-  // Food Master nutrition is treated as the nutrition for ONE standard
-  // serving of that food. Therefore:
-  //   1 piece/glass = 1 nutrition serving
-  //   2 pieces/glasses = 2 nutrition servings
-  //   3 pieces/glasses = 3 nutrition servings
-  //
-  // No g, kg, ml, L, slice, cup, bowl, etc. are used in this calculation.
-  const mealUnit = normalizeMealFoodUnit(unit);
-  if (!MEAL_FOOD_UNITS.includes(mealUnit)) {
-    return { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  }
+  const stdQty = numericQuantity(food.standardQuantity) || 1;
+  const sameUnit = normalizeUnit(unit) === normalizeUnit(food.unit);
+  const servings = sameUnit ? qty / stdQty : qty;
 
   return {
-    calories: Number(food.calories || 0) * qty,
-    protein: Number(food.protein || 0) * qty,
-    carbs: Number(food.carbs || 0) * qty,
-    fat: Number(food.fat || 0) * qty,
+    calories: Number(food.calories || 0) * servings,
+    protein: Number(food.protein || 0) * servings,
+    carbs: Number(food.carbs || 0) * servings,
+    fat: Number(food.fat || 0) * servings,
   };
 }
 
@@ -616,7 +605,10 @@ export default function DietTemplateTab() {
         setStore(KEYS.DIET_TEMPLATES, merged);
       }
     } catch (error) {
-      console.warn("Diet Template API unavailable; using current-session data only.", error);
+      console.warn(
+        "Diet Template API unavailable; using current-session data only.",
+        error,
+      );
       loadLocal(currentPage, pageSize);
     } finally {
       setLoading(false);
@@ -1002,6 +994,13 @@ export default function DietTemplateTab() {
       alert("Diet Template Code is required.");
       return null;
     }
+    if (
+      !Number.isFinite(payload.targetCalories) ||
+      payload.targetCalories < 0
+    ) {
+      alert("Target kcal cannot be negative.");
+      return null;
+    }
 
     // The mode is decided by the actual editor state, not by an id accidentally
     // present in the form. A NEW template always uses POST and never sends an
@@ -1255,10 +1254,22 @@ ${mealItemFailures.join(
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 style={{ fontSize: "var(--font-h3)", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+          <h2
+            style={{
+              fontSize: "var(--font-h3)",
+              fontWeight: 700,
+              color: "var(--text-primary)",
+              margin: 0,
+            }}
+          >
             Diet Templates
           </h2>
-          <p style={{ fontSize: "var(--font-caption)", color: "var(--text-secondary)" }}>
+          <p
+            style={{
+              fontSize: "var(--font-caption)",
+              color: "var(--text-secondary)",
+            }}
+          >
             Diet type + meal mapping + Food Master portions in one template.
           </p>
         </div>
@@ -1302,7 +1313,12 @@ ${mealItemFailures.join(
           Search
         </button>
         {loading && (
-          <span style={{ fontSize: "var(--font-caption)", color: "var(--text-secondary)" }}>
+          <span
+            style={{
+              fontSize: "var(--font-caption)",
+              color: "var(--text-secondary)",
+            }}
+          >
             Loading...
           </span>
         )}
@@ -1530,8 +1546,17 @@ function TemplateRow({ diet, onEdit, onDelete }) {
   return (
     <tr style={{ borderTop: "1px solid var(--border)" }}>
       <td className="px-3 py-2.5">
-        <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{diet.name}</div>
-        <div style={{ fontSize: "var(--font-label)", color: "var(--text-secondary)" }}>{diet.code}</div>
+        <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+          {diet.name}
+        </div>
+        <div
+          style={{
+            fontSize: "var(--font-label)",
+            color: "var(--text-secondary)",
+          }}
+        >
+          {diet.code}
+        </div>
       </td>
       <td
         className="max-w-[360px] truncate px-3 py-2.5"
@@ -1554,7 +1579,12 @@ function TemplateRow({ diet, onEdit, onDelete }) {
             ))}
           </div>
         ) : (
-          <span style={{ fontSize: "var(--font-caption)", color: "var(--text-secondary)" }}>
+          <span
+            style={{
+              fontSize: "var(--font-caption)",
+              color: "var(--text-secondary)",
+            }}
+          >
             No meals configured
           </span>
         )}
@@ -1564,7 +1594,12 @@ function TemplateRow({ diet, onEdit, onDelete }) {
           <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>
             {Math.round(nutrition.calories)} kcal
           </div>
-          <div style={{ fontSize: "var(--font-label)", color: "var(--text-secondary)" }}>
+          <div
+            style={{
+              fontSize: "var(--font-label)",
+              color: "var(--text-secondary)",
+            }}
+          >
             P:{nutrition.protein.toFixed(1)}g · C:{nutrition.carbs.toFixed(1)}g
             · F:{nutrition.fat.toFixed(1)}g
           </div>
@@ -1577,7 +1612,13 @@ function TemplateRow({ diet, onEdit, onDelete }) {
           <Users size={12} /> {patientsWithoutMealPlan.length}
         </span>
         {patientsWithoutMealPlan.length > 0 && (
-          <div style={{ marginTop: 2, fontSize: "var(--font-label)", color: "var(--text-secondary)" }}>
+          <div
+            style={{
+              marginTop: 2,
+              fontSize: "var(--font-label)",
+              color: "var(--text-secondary)",
+            }}
+          >
             {patientsWithoutMealPlan
               .slice(0, 2)
               .map((p) => p.name)
@@ -1654,9 +1695,8 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
   const [selectedFood, setSelectedFood] = useState({});
   const [selectedMealType, setSelectedMealType] = useState("");
   const [saving, setSaving] = useState(false);
-  const [loadingTemplateItems, setLoadingTemplateItems] = useState(
-    !isNewTemplate,
-  );
+  const [loadingTemplateItems, setLoadingTemplateItems] =
+    useState(!isNewTemplate);
   const [templateItemLoadError, setTemplateItemLoadError] = useState("");
 
   useEffect(() => {
@@ -1668,8 +1708,7 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
         if (!active) return;
         const existingMappings = getStore(KEYS.DIET_MAPPING, []) || [];
         const otherMappings = existingMappings.filter(
-          (mapping) =>
-            Number(mapping.dietTemplateId) !== Number(templateId),
+          (mapping) => Number(mapping.dietTemplateId) !== Number(templateId),
         );
         setDraft(
           buildDraft(
@@ -1696,7 +1735,12 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
     return () => {
       active = false;
     };
-  }, [isNewTemplate, normalized.templateId, normalized.id, normalized.dietTypeId]);
+  }, [
+    isNewTemplate,
+    normalized.templateId,
+    normalized.id,
+    normalized.dietTypeId,
+  ]);
 
   const totals = useMemo(
     () =>
@@ -1804,7 +1848,7 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
   };
 
   const changeUnit = (mealName, foodId, value) => {
-    if (!MEAL_FOOD_UNITS.includes(value)) return;
+    if (!STANDARD_UNITS.includes(value)) return;
     updateMeal(mealName, (meal) => ({
       ...meal,
       foodItems: meal.foodItems.map((item) =>
@@ -1853,7 +1897,12 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
       size="xl"
       footer={
         <div className="flex items-center justify-between">
-          <div style={{ fontSize: "var(--font-caption)", color: "var(--text-secondary)" }}>
+          <div
+            style={{
+              fontSize: "var(--font-caption)",
+              color: "var(--text-secondary)",
+            }}
+          >
             Target: {Math.round(form.targetCalories || 0)} kcal | Meals:{" "}
             {Math.round(totals.calories)} kcal | Remaining:{" "}
             {Math.max(
@@ -1873,7 +1922,9 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
             <button
               type="button"
               onClick={submit}
-              disabled={saving || loadingTemplateItems || Boolean(templateItemLoadError)}
+              disabled={
+                saving || loadingTemplateItems || Boolean(templateItemLoadError)
+              }
               className="hospital-button"
             >
               <Save size={15} />{" "}
@@ -1911,7 +1962,10 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
             </label>
           </div>
           <div>
-            <label className="hospital-label" style={{ display: "block", marginBottom: "var(--space-1)" }}>
+            <label
+              className="hospital-label"
+              style={{ display: "block", marginBottom: "var(--space-1)" }}
+            >
               Code
             </label>
             <input
@@ -1921,15 +1975,27 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
             />
           </div>
           <div>
-            <label className="hospital-label" style={{ display: "block", marginBottom: "var(--space-1)" }}>
+            <label
+              className="hospital-label"
+              style={{ display: "block", marginBottom: "var(--space-1)" }}
+            >
               Target kcal
             </label>
             <input
-              type="number"
-              value={form.targetCalories}
-              onChange={(e) =>
-                setForm({ ...form, targetCalories: e.target.value })
+              type="text"
+              inputMode="numeric"
+              placeholder="0"
+              value={
+                form.targetCalories === 0 || form.targetCalories === "0"
+                  ? ""
+                  : form.targetCalories
               }
+              onChange={(e) => {
+                const cleaned = e.target.value
+                  .replace(/\D/g, "") // digits only (no minus, e, dot)
+                  .replace(/^0+(?=\d)/, ""); // strip leading zeros: "05" -> "5"
+                setForm({ ...form, targetCalories: cleaned });
+              }}
               className="hospital-input"
             />
           </div>
@@ -1945,7 +2011,10 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
             />
           </div>*/}
           <div>
-            <label className="hospital-label" style={{ display: "block", marginBottom: "var(--space-1)" }}>
+            <label
+              className="hospital-label"
+              style={{ display: "block", marginBottom: "var(--space-1)" }}
+            >
               Status
             </label>
             <select
@@ -1962,7 +2031,10 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
         </div>
 
         <div>
-          <label className="hospital-label" style={{ display: "block", marginBottom: "var(--space-1)" }}>
+          <label
+            className="hospital-label"
+            style={{ display: "block", marginBottom: "var(--space-1)" }}
+          >
             Description
           </label>
           <textarea
@@ -1973,12 +2045,15 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
           />
         </div>
 
-        <div className="hospital-alert hospital-alert-info" style={{ marginBottom: 0, fontSize: "var(--font-caption)" }}>
+        {/* <div
+          className="hospital-alert hospital-alert-info"
+          style={{ marginBottom: 0, fontSize: "var(--font-caption)" }}
+        >
           Target from diet plan: {Math.round(nutritionTarget.calories)} kcal · P{" "}
           {Math.round(nutritionTarget.protein)}g · C{" "}
           {Math.round(nutritionTarget.carbs)}g · F{" "}
           {Math.round(nutritionTarget.fat)}g
-        </div>
+        </div> */}
 
         <div
           style={{
@@ -1990,10 +2065,18 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
         >
           <div className="flex items-center justify-between gap-2">
             <div>
-              <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
+              <div
+                className="text-xs font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Meal Template
               </div>
-              <div style={{ fontSize: "var(--font-label)", color: "var(--text-secondary)" }}>
+              <div
+                style={{
+                  fontSize: "var(--font-label)",
+                  color: "var(--text-secondary)",
+                }}
+              >
                 Add meal timing and choose food directly from Food Master.
               </div>
             </div>
@@ -2101,13 +2184,29 @@ function MealEditor({
   );
 
   return (
-    <section style={{ borderBottom: "1px solid var(--border)", paddingBottom: "var(--space-2)" }}>
+    <section
+      style={{
+        borderBottom: "1px solid var(--border)",
+        paddingBottom: "var(--space-2)",
+      }}
+    >
       <div className="flex items-center justify-between gap-2">
         <div>
-          <div style={{ fontSize: "var(--font-body)", fontWeight: 700, color: "var(--text-primary)" }}>
+          <div
+            style={{
+              fontSize: "var(--font-body)",
+              fontWeight: 700,
+              color: "var(--text-primary)",
+            }}
+          >
             {meal.mealName}
           </div>
-          <div style={{ fontSize: "var(--font-label)", color: "var(--text-secondary)" }}>
+          <div
+            style={{
+              fontSize: "var(--font-label)",
+              color: "var(--text-secondary)",
+            }}
+          >
             {Math.round(mealNutrition.calories)} kcal · P{" "}
             {mealNutrition.protein.toFixed(1)}g · C{" "}
             {mealNutrition.carbs.toFixed(1)}g · F {mealNutrition.fat.toFixed(1)}
@@ -2162,15 +2261,29 @@ function MealEditor({
                 <div className="min-w-0 flex-1">
                   <div
                     className="truncate"
-                    style={{ fontWeight: 600, fontSize: "var(--font-body)", color: "var(--text-primary)" }}
+                    style={{
+                      fontWeight: 600,
+                      fontSize: "var(--font-body)",
+                      color: "var(--text-primary)",
+                    }}
                   >
                     {food.name}
                   </div>
-                  <div style={{ fontSize: "var(--font-label)", color: "var(--text-secondary)" }}>
+                  <div
+                    style={{
+                      fontSize: "var(--font-label)",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
                     {food.category} · {food.calories} kcal · P {food.protein}g ·
                     C {food.carbs}g · F {food.fat}g
                   </div>
-                  <div style={{ fontSize: "var(--font-label)", color: "var(--hospital-primary)" }}>
+                  <div
+                    style={{
+                      fontSize: "var(--font-label)",
+                      color: "var(--hospital-primary)",
+                    }}
+                  >
                     Quantity for {patientCount || 0} patient
                     {patientCount === 1 ? "" : "s"}:{" "}
                     {numericQuantity(item.quantity) !== null
@@ -2193,7 +2306,7 @@ function MealEditor({
                   style={{ width: 80, minHeight: "unset", padding: "3px 6px" }}
                   aria-label={`Unit for ${food.name}`}
                 >
-                  {MEAL_FOOD_UNITS.map((unit) => (
+                  {STANDARD_UNITS.map((unit) => (
                     <option key={unit} value={unit}>
                       {unit}
                     </option>
@@ -2203,7 +2316,11 @@ function MealEditor({
                   type="button"
                   onClick={() => onRemove(item.foodId)}
                   className="icon-btn"
-                  style={{ minWidth: 28, minHeight: 28, color: "var(--color-error)" }}
+                  style={{
+                    minWidth: 28,
+                    minHeight: 28,
+                    color: "var(--color-error)",
+                  }}
                   title="Remove food"
                 >
                   <X size={14} />
@@ -2212,7 +2329,13 @@ function MealEditor({
             );
           })
         ) : (
-          <div style={{ fontSize: "var(--font-label)", color: "var(--text-secondary)", padding: "var(--space-1) 0" }}>
+          <div
+            style={{
+              fontSize: "var(--font-label)",
+              color: "var(--text-secondary)",
+              padding: "var(--space-1) 0",
+            }}
+          >
             No food items configured.
           </div>
         )}

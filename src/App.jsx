@@ -167,10 +167,10 @@ function App() {
     let active = true;
     const initialize = async () => {
       const urlParams = new URLSearchParams(window.location.search);
-      const token = urlParams.get("token");
-      const userId = urlParams.get("userId");
-      const clinicId = urlParams.get("clinicId");
-      const zoneId = urlParams.get("zoneId");
+      const token = urlParams.get("token") || "SmartCare eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJkZW1vZDEyMzQiLCJjbGluaWMiOiJhdXJldXMiLCJleHAiOjE3OTE0NjgyNjgsImlhdCI6MTc5MTQ0NjY2OH0.OVO7Jm9BDv-1UJQ7gP5xOAJDV3IWY4G7nhzAIsXwhEiqDuCrNbPnTi88VBvI5-uI2Vdsa0R6cE9GMy8n1jdheA";
+      const userId = urlParams.get("userId") || "demo1234";
+      const clinicId = urlParams.get("clinicId") || "aureus";
+      const zoneId = urlParams.get("zoneId") || "Asia/Kolkata";
       if (token) sessionStorage.setItem("AUTHTOKEN", token);
       if (userId) sessionStorage.setItem("UserId", userId);
       if (clinicId) sessionStorage.setItem("ClinicId", clinicId);

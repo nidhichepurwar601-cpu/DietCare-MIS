@@ -137,6 +137,20 @@ export default function DietManagerReference({ embedded = false } = {}) {
   const [toast, setToast] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [, setStoreVersion] = useState(0);
+  const [appliedFilters, setAppliedFilters] = useState({
+    search: "",
+    ward: "All Wards",
+    diet: "All Diet Plans",
+    status: "All Status",
+  });
+
+  const handleView = () =>
+    setAppliedFilters({
+      search: search.trim(),
+      ward: wardFilter,
+      diet: dietFilter,
+      status: statusFilter,
+    });
   // LIVE STORE SYNC: keep diet-plan rows connected to patient/master/workflow changes.
   useEffect(() => {
     const refresh = () => {
@@ -367,31 +381,24 @@ export default function DietManagerReference({ embedded = false } = {}) {
         ]
           .join(" ")
           .toLowerCase()
-          .includes(search.toLowerCase()),
+          .includes(appliedFilters.search.toLowerCase()),
       )
       .filter(
         (x) =>
-          wardFilter === "All Wards" ||
-          patient(x.patientId)?.ward === wardFilter,
+          appliedFilters.ward === "All Wards" ||
+          patient(x.patientId)?.ward === appliedFilters.ward,
       )
       .filter(
         (x) =>
-          dietFilter === "All Diet Plans" ||
-          dietType(x.dietTypeId)?.name === dietFilter,
+          appliedFilters.diet === "All Diet Plans" ||
+          dietType(x.dietTypeId)?.name === appliedFilters.diet,
       )
       .filter(
         (x) =>
-          statusFilter === "All Status" || x.assignmentStatus === statusFilter,
+          appliedFilters.status === "All Status" ||
+          x.assignmentStatus === appliedFilters.status,
       );
-  }, [
-    patients,
-    plans,
-    workflows,
-    search,
-    wardFilter,
-    dietFilter,
-    statusFilter,
-  ]);
+  }, [patients, plans, workflows, appliedFilters]);
   const persist = (x) => {
     setPlans(x);
     setStore(PLAN_KEY, x);
@@ -538,7 +545,9 @@ export default function DietManagerReference({ embedded = false } = {}) {
           .sort((a, b) => Number(b.id) - Number(a.id))[0];
       }
       if (!loadedPlan) {
-        throw new Error("The plan was saved, but it was not returned by the server.");
+        throw new Error(
+          "The plan was saved, but it was not returned by the server.",
+        );
       }
       savedPlan = { ...loadedPlan, dietHistory };
     } catch (error) {
@@ -633,9 +642,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
       );
     } else {
       persist([
-        ...currentPlans.filter(
-          (x) => String(x.id) !== String(savedPlan.id),
-        ),
+        ...currentPlans.filter((x) => String(x.id) !== String(savedPlan.id)),
         savedPlan,
       ]);
       flow.planId = savedPlan.id;
@@ -728,7 +735,9 @@ export default function DietManagerReference({ embedded = false } = {}) {
         }
         const loadedPlans = await loadData();
         if (!loadedPlans) {
-          throw new Error("The plan was deleted, but the list could not refresh.");
+          throw new Error(
+            "The plan was deleted, but the list could not refresh.",
+          );
         }
         setToast("Diet plan deleted.");
       } catch (error) {
@@ -765,9 +774,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
         <div className="hospital-card" data-card-style="outlined">
           <div className="hospital-card-header">
             <div>
-              <h2 className="hospital-card-title">
-                Patient Diet Overview
-              </h2>
+              <h2 className="hospital-card-title">Patient Diet Overview</h2>
               <p className="hospital-card-subtitle">
                 View and manage diet assignment status for all patients.
               </p>
@@ -841,17 +848,38 @@ export default function DietManagerReference({ embedded = false } = {}) {
                 <option>Not Assigned</option>
               </select>
             </label>
-            <div className="hospital-field" style={{ minWidth: 240, position: "relative" }}>
-              <Search
-                className="absolute left-3 top-[50%] -translate-y-1/2 text-gray-400"
-                size={17}
-              />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search patient or ID..."
-                className="hospital-input pl-10"
-              />
+            <div
+              className="hospital-field"
+              style={{
+                flex: "1 1 320px",
+                minWidth: 0,
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "flex-end",
+                gap: 8,
+              }}
+            >
+              <div style={{ position: "relative", flex: 1 }}>
+                <Search
+                  className="absolute left-3 top-[50%] -translate-y-1/2 text-gray-400"
+                  size={17}
+                />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleView()}
+                  placeholder="Search patient or ID..."
+                  className="hospital-input pl-10"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleView}
+                disabled={loading}
+                className="hospital-button"
+              >
+                <Eye size={15} /> View
+              </button>
             </div>
           </div>
         </div>
@@ -877,7 +905,11 @@ export default function DietManagerReference({ embedded = false } = {}) {
             {
               key: "patientName",
               label: "Patient",
-              render: (row) => <span className="font-semibold">{patient(row.patientId)?.name}</span>,
+              render: (row) => (
+                <span className="font-semibold">
+                  {patient(row.patientId)?.name}
+                </span>
+              ),
             },
             {
               key: "wardBed",
@@ -887,7 +919,9 @@ export default function DietManagerReference({ embedded = false } = {}) {
                 return (
                   <div>
                     {p?.ward || "—"}
-                    <div className="text-xs text-gray-500">{p?.bedNo || p?.bed || "—"}</div>
+                    <div className="text-xs text-gray-500">
+                      {p?.bedNo || p?.bed || "—"}
+                    </div>
                   </div>
                 );
               },
@@ -945,7 +979,8 @@ export default function DietManagerReference({ embedded = false } = {}) {
                         dietTemplateId:
                           row.dietTemplateId ||
                           dietTemplates.find(
-                            (t) => Number(t.dietTypeId) === Number(row.dietTypeId),
+                            (t) =>
+                              Number(t.dietTypeId) === Number(row.dietTypeId),
                           )?.id ||
                           "",
                       });
@@ -970,7 +1005,8 @@ export default function DietManagerReference({ embedded = false } = {}) {
                           dietTypeId: String(p?.dietTypeId || ""),
                           dietTemplateId: String(
                             dietTemplates.find(
-                              (t) => Number(t.dietTypeId) === Number(p?.dietTypeId),
+                              (t) =>
+                                Number(t.dietTypeId) === Number(p?.dietTypeId),
                             )?.id || "",
                           ),
                           allergensText: (p?.allergens || [])
@@ -979,7 +1015,8 @@ export default function DietManagerReference({ embedded = false } = {}) {
                           specialInstructions: p?.specialInstructions || "",
                           intestinalDetails:
                             p?.intestinalDetails || p?.intestinalDetail || "",
-                          bedDetails: `${p?.ward || ""} / ${p?.bedNo || p?.bed || ""}`.trim(),
+                          bedDetails:
+                            `${p?.ward || ""} / ${p?.bedNo || p?.bed || ""}`.trim(),
                         });
                         setMode("create");
                       } else {
