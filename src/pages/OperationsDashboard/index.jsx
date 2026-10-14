@@ -139,14 +139,16 @@ export default function DietaryOperationsDashboard() {
   const loadDashboard = useCallback(async () => {
     try {
       setError("");
-      const res = await dashboardService.getDashboard();
+      const res = await dashboardService.getDashboard({
+        serviceDate: todayDate,
+      });
       setSummary(extractSummary(res));
     } catch (e) {
       setError(e?.message || "Failed to load dashboard");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [todayDate]);
 
   /* ── Reactive refresh ─────────────────────────────────────── */
   useEffect(() => {
