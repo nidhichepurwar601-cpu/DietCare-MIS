@@ -100,7 +100,7 @@ const isItemRow = (row) =>
   (row.mealTypeId ?? row.meal_type_id) != null;
 
 function readTemplateItems(templateId) {
-  const key = String(templateId);
+  const key = `${getApiCacheGeneration()}:${templateId}`;
   const cached = templateItemReadCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.promise;
 
@@ -150,19 +150,27 @@ function mapTemplateItems(template, rows) {
   return [...byMeal.values()];
 }
 
-function loadMappings(templates) {
+async function loadMappings(templates) {
   const mappings = [];
   const mappingWarnings = [];
 
-  for (const template of templates) {
-    const embedded = inlineItems(template);
-    if (Array.isArray(embedded) && embedded.length) {
-      mappings.push(...mapTemplateItems(
-        template,
-        embedded.filter((row) => row && isItemRow(row)),
-      ));
-    }
-  }
+  await Promise.all(
+    templates.map(async (template) => {
+      const embedded = inlineItems(template);
+      if (Array.isArray(embedded) && embedded.length) {
+        mappings.push(
+          ...mapTemplateItems(template, embedded.filter((r) => r && isItemRow(r))),
+        );
+        return;
+      }
+      const result = await readTemplateItems(template.templateId);
+      if (result.error) {
+        mappingWarnings.push({ templateId: template.templateId, error: result.error });
+        return;
+      }
+      mappings.push(...mapTemplateItems(template, result.rows));
+    }),
+  );
 
   return { mappings, mappingWarnings };
 }
