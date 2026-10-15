@@ -41,6 +41,7 @@ import {
 } from "../../components/common/MvpTools.jsx";
 
 const PLAN_KEY = "hd_diet_plans";
+const currentUserId = () => Number(sessionStorage.getItem("UserId")) || 0;
 // API-ready clinician allocation helper: Doctor/Dietitian will be populated by the patient API later.
 const getAllocatedClinician = (patient) =>
   patient?.allocatedByName ||
@@ -106,7 +107,7 @@ const blank = {
   dietTypeId: "",
   startDate: getLocalDateKey(),
   endDate: "",
-  status: "Not Assigned",
+  status: "Unassigned",
   remarks: "",
   planningRemarks: "",
   nursingRemarks: "",
@@ -134,7 +135,19 @@ export default function DietManagerReference({ embedded = false } = {}) {
   const [form, setForm] = useState(blank);
   const [mode, setMode] = useState("");
   const [selected, setSelected] = useState(null);
-  const [toast, setToast] = useState("");
+  const [toast, setToastRaw] = useState("");
+  const [toastType, setToastType] = useState("success");
+  const setToast = (message, type) => {
+    setToastType(
+      type ||
+        (/unable|could not|not |select|must|reject|fail|before|required|invalid|error/i.test(
+          String(message),
+        )
+          ? "error"
+          : "success"),
+    );
+    setToastRaw(message);
+  };
   const [historyOpen, setHistoryOpen] = useState(false);
   const [, setStoreVersion] = useState(0);
   const [appliedFilters, setAppliedFilters] = useState({
@@ -233,7 +246,12 @@ export default function DietManagerReference({ embedded = false } = {}) {
   const loadSummary = useCallback(async (filters) => {
     try {
       const res = await patientDietPlanService.getSummary({
-        assignmentStatus: filters.status === "All Status" ? "" : filters.status,
+        assignmentStatus:
+          filters.status === "All Status"
+            ? ""
+            : filters.status === "Unassigned"
+              ? "UNASSIGN"
+              : filters.status,
         searchText: filters.search,
       });
       setSummary(res);
@@ -258,8 +276,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
   const diet = (id) => dietTemplates.find((x) => String(x.id) === String(id));
   const selectedPatient = patient(form.patientId);
   // Read-only status shown in the Edit modal. It follows the table row.
-  const formIsAssigned =
-    mode !== "edit" || form.assignmentStatus !== "Not Assigned";
+  const formIsAssigned = Boolean(form.dietTemplateId);
   const statusLabel = formIsAssigned ? "ASSIGNED" : "UNASSIGNED";
   // Pregnancy workflow is only applicable to female patients; API data may still contain a stale flag for others.
   const isFemalePatient =
@@ -389,9 +406,9 @@ export default function DietManagerReference({ embedded = false } = {}) {
             planName: "",
           }),
           patientId: p.id,
-          assignmentStatus: assigned ? "Assigned" : "Not Assigned",
-          status: assigned ? "Assigned" : "Not Assigned",
-          workflowStatus: flow?.status || "Not Assigned",
+          assignmentStatus: assigned ? "Assigned" : "Unassigned",
+          status: assigned ? "Assigned" : "Unassigned",
+          workflowStatus: flow?.status || "Unassigned",
           auto: !plan,
         };
       })
@@ -444,6 +461,10 @@ export default function DietManagerReference({ embedded = false } = {}) {
       setToast("Select a Diet Plan.");
       return;
     }
+    if (form.endDate && form.startDate && form.endDate < form.startDate) {
+      setToast("End date cannot be before the start date.");
+      return;
+    }
     if (isPregnant && String(form.dietTypeId) !== String(prescriptionDietId)) {
       setToast("Pregnant patient diet must match the consultant prescription.");
       return;
@@ -456,9 +477,10 @@ export default function DietManagerReference({ embedded = false } = {}) {
     // available to Kitchen Operations as Assigned; operational meal statuses
     // are tracked separately by the kitchen/delivery modules.
     // Keep an unassigned plan unassigned. The status is changed only from the table.
-    const keepUnassigned =
-      mode === "edit" && form.assignmentStatus === "Not Assigned";
-    const workflowStatus = keepUnassigned ? "UNASSIGN" : "Assigned";
+    // A diet template is required to save, so a saved plan is assigned.
+    const hasTemplate = Boolean(form.dietTemplateId);
+    const workflowStatus = hasTemplate ? "Assigned" : "Unassigned"; // local/UI value
+    const apiStatus = hasTemplate ? "ASSIGN" : "UNASSIGN"; // value the backend expects
     const nextForm = {
       ...form,
       dietTemplateId: String(form.dietTemplateId),
@@ -482,7 +504,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
       dietTypeId: Number(nextForm.dietTypeId),
       dietTemplateId: Number(nextForm.dietTemplateId),
       planId: nextForm.id || existingFlow?.planId || null,
-      status: keepUnassigned ? "Not Assigned" : workflowStatus,
+      status: workflowStatus,
       endDate: nextForm.endDate || "",
       planName: nextForm.planName,
       startDate: nextForm.startDate,
@@ -531,13 +553,13 @@ export default function DietManagerReference({ embedded = false } = {}) {
         ? await patientDietPlanService.updatePlanById(
             form.id,
             toDietPlanApiPayload(
-              { ...nextForm, status: workflowStatus },
+              { ...nextForm, status: apiStatus, dietitianPractId: currentUserId() },
               { template: selectedDietTemplate, isUpdate: true },
             ),
           )
         : await patientDietPlanService.createPlan(
             toDietPlanApiPayload(
-              { ...nextForm, status: workflowStatus },
+              { ...nextForm, status: apiStatus, dietitianPractId: currentUserId() },
               { template: selectedDietTemplate },
             ),
           );
@@ -808,11 +830,21 @@ export default function DietManagerReference({ embedded = false } = {}) {
     if (x.auto || x.id == null || saving) return;
     const makeAssigned = x.assignmentStatus !== "Assigned";
     if (!makeAssigned && !confirm("Unassign this diet plan?")) return;
+
+    // Assign needs a real dietitian/practitioner id; unassign sends 0.
+    const practId = Number(x.dietitianPractId) || currentUserId();
+    if (makeAssigned && !practId) {
+      setToast(
+        "No dietitian is linked to this plan. Select a dietitian first.",
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const response = await patientDietPlanService.updateAssignment(x.id, {
-        dietTypeId: x.dietTypeId,
-        dietitionPractId: 0,
+        dietTypeId: Number(x.dietTypeId),
+        dietitianPractId: makeAssigned ? practId : 0,
         assignmentStatus: makeAssigned ? "ASSIGN" : "UNASSIGN",
       });
       if (
@@ -837,7 +869,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
           String(f.patientId) === String(x.patientId)
             ? {
                 ...f,
-                status: makeAssigned ? "Assigned" : "Not Assigned",
+                status: makeAssigned ? "Assigned" : "Unassigned",
                 updatedAt: new Date().toISOString(),
               }
             : f,
@@ -863,7 +895,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
 
   const content = (
     <>
-      <Toast message={toast} onClose={() => setToast("")} />
+      <Toast message={toast} type={toastType} onClose={() => setToastRaw("")} />
       <div className="space-y-4">
         {loadError && (
           <div
@@ -914,7 +946,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
             {/*<button
               type="button"
               onClick={() => {
-                const first = rows.find((x) => x.assignmentStatus === "Not Assigned") || rows[0];
+                const first = rows.find((x) => x.assignmentStatus === "Unassigned") || rows[0];
                 if (first) {
                   const p = patient(first.patientId);
                   setForm({
@@ -975,7 +1007,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
               >
                 <option>All Status</option>
                 <option>Assigned</option>
-                <option>Not Assigned</option>
+                <option>Unassigned</option>
               </select>
             </label>
             <div
@@ -1107,7 +1139,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
               className: "text-right",
               render: (row) => (
                 <div className="flex justify-end gap-2">
-                  <button
+                  {/*  <button
                     title="View meal plan"
                     type="button"
                     onClick={(event) => {
@@ -1128,7 +1160,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
                     className="icon-btn"
                   >
                     <Eye size={16} />
-                  </button>
+                  </button> */}
                   <button
                     title={
                       row.assignmentStatus === "Assigned"

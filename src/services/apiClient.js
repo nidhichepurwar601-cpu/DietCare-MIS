@@ -4,7 +4,7 @@ import {
   getSessionAuthHeaders,
   TIMEOUT_MS,
 } from "../config/api.config";
-import { messageForHttpStatus } from '../lib/apiErrors.js';
+import { messageForHttpStatus, extractApiMessage } from '../lib/apiErrors.js';
 
 /**
  * Custom API Error class to handle HTTP errors systematically.
@@ -51,7 +51,9 @@ async function requestOnce(url, config) {
     const data = await parseBody(response);
     if (!response.ok) {
       throw new APIError(
-        messageForHttpStatus(response.status, data?.message),
+        // Prefer the backend's own message; fall back to the generic status text.
+        extractApiMessage(data) ||
+          messageForHttpStatus(response.status, data?.message),
         response.status,
         data
       );

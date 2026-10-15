@@ -1,3 +1,27 @@
+export function extractApiMessage(data) {
+  if (!data) return "";
+  if (typeof data === "string") return data.trim();
+  const pick = (v) => (typeof v === "string" && v.trim() ? v.trim() : "");
+  const cause =
+    pick(data.error?.cause) || pick(data.error?.message) || pick(data.cause);
+  if (cause) return cause;
+  const direct =
+    pick(data.message) ||
+    pick(data.error) ||
+    pick(data.detail) ||
+    pick(data.errorMessage);
+  if (direct) return direct;
+  if (Array.isArray(data.errors)) {
+    const list = data.errors
+      .map((e) =>
+        typeof e === "string" ? e : pick(e?.message) || pick(e?.defaultMessage),
+      )
+      .filter(Boolean);
+    if (list.length) return list.join(" ");
+  }
+  return pick(data.error?.message);
+}
+
 export function messageForHttpStatus(status, fallback) {
   const map = {
     400: "The request could not be processed. Check the entered values.",
@@ -26,7 +50,10 @@ export function normalizeApiError(error) {
   if (status) {
     return {
       status,
-      message: messageForHttpStatus(status, error.message),
+      // Prefer the backend's own message; fall back to the generic text.
+      message:
+        extractApiMessage(error.data) ||
+        messageForHttpStatus(status, error.message),
       kind: "http",
       data: error.data,
     };

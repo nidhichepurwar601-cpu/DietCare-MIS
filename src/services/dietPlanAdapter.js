@@ -93,6 +93,7 @@ export function toDietPlanApiPayload(
   return {
     patientId: Number(form.patientId),
     dietTemplateId: Number(form.dietTemplateId),
+    dietitianPractId: Number(form.dietitianPractId) || 0,
     planName: text(form.planName || template?.name),
     startDate: form.startDate || null,
     endDate: form.endDate || null,
@@ -126,6 +127,12 @@ export function fromApiRow(row, templates = []) {
     patientId: row.patientId,
     dietTemplateId: templateId != null ? String(templateId) : "",
     dietTypeId: template?.dietTypeId ?? row.dietTypeId ?? "",
+    dietitianPractId:
+      row.dietitianPractId ??
+      row.dietitianPractId ??
+      row.dietitianPractId ??
+      row.dietitianId ??
+      0,
     planName: row.planName ?? "",
     startDate: row.startDate ?? "",
     endDate: row.endDate ?? "",
