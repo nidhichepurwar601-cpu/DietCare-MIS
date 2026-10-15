@@ -180,6 +180,7 @@ const ENDPOINTS = {
     CREATE:        '/dietmanager/create',
     GET_BY_ID:     (id) => `/dietmanager/get/by/${id}`,
     GET_ALL:       '/dietmanager/get',
+    SUMMARY:      '/dietmanager/summary',
     UPDATE_BY_ID:  (id) => `/dietmanager/update/${id}`,
     DELETE:        (id) => `/dietmanager/delete/${id}`,
     UPDATE_STATUS: (id) => `/dietmanager/update/status/${id}`,

@@ -143,6 +143,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
     diet: "All Diet Plans",
     status: "All Status",
   });
+  const [summary, setSummary] = useState(null);
 
   const handleView = () =>
     setAppliedFilters({
@@ -171,13 +172,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
     try {
       const [master, planResponse] = await Promise.all([
         loadMasterData(),
-        patientDietPlanService.getAllPlans({
-          ward: "",
-          dietPlan: "",
-          assignmentStatus: "",
-          searchText: "",
-          paginationInfo: { currentPage: 0, pageSize: 100 },
-        }),
+        patientDietPlanService.getAllPlans(),
       ]);
       if (
         !planResponse ||
@@ -235,6 +230,23 @@ export default function DietManagerReference({ embedded = false } = {}) {
     loadData();
   }, [loadData]);
 
+  const loadSummary = useCallback(async (filters) => {
+    try {
+      const res = await patientDietPlanService.getSummary({
+        assignmentStatus: filters.status === "All Status" ? "" : filters.status,
+        searchText: filters.search,
+      });
+      setSummary(res);
+    } catch (error) {
+      console.error("Diet Manager summary failed", error);
+      setSummary(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSummary(appliedFilters);
+  }, [appliedFilters.status, appliedFilters.search, loadSummary]);
+
   const dietTypes = getStore(KEYS.DIET_TYPES);
   const dietTemplates = getStore(KEYS.DIET_TEMPLATES, []);
   const mappings = getStore(KEYS.DIET_MAPPING);
@@ -245,6 +257,10 @@ export default function DietManagerReference({ embedded = false } = {}) {
   const dietType = (id) => dietTypes.find((x) => String(x.id) === String(id));
   const diet = (id) => dietTemplates.find((x) => String(x.id) === String(id));
   const selectedPatient = patient(form.patientId);
+  // Read-only status shown in the Edit modal. It follows the table row.
+  const formIsAssigned =
+    mode !== "edit" || form.assignmentStatus !== "Not Assigned";
+  const statusLabel = formIsAssigned ? "ASSIGNED" : "UNASSIGNED";
   // Pregnancy workflow is only applicable to female patients; API data may still contain a stale flag for others.
   const isFemalePatient =
     String(selectedPatient?.gender || "")
@@ -344,16 +360,24 @@ export default function DietManagerReference({ embedded = false } = {}) {
         const flow = workflows.find(
           (x) => String(x.patientId) === String(p.id),
         );
-        const assigned =
-          !!plan ||
-          [
-            "Assigned",
-            "Approved",
-            "Preparing",
-            "Prepared",
-            "Delivering",
-            "Delivered",
-          ].includes(flow?.status);
+        const planStatus = String(plan?.status || "")
+          .replace(/\s+/g, "")
+          .toUpperCase();
+        const planUnassigned = [
+          "UNASSIGN",
+          "UNASSIGNED",
+          "NOTASSIGNED",
+        ].includes(planStatus);
+        const assigned = plan
+          ? !planUnassigned
+          : [
+              "Assigned",
+              "Approved",
+              "Preparing",
+              "Prepared",
+              "Delivering",
+              "Delivered",
+            ].includes(flow?.status);
         return {
           ...(plan || {
             id: `patient-${p.id}`,
@@ -431,7 +455,10 @@ export default function DietManagerReference({ embedded = false } = {}) {
     // Step 1 has only two assignment states. Saving a plan always makes it
     // available to Kitchen Operations as Assigned; operational meal statuses
     // are tracked separately by the kitchen/delivery modules.
-    const workflowStatus = "Assigned";
+    // Keep an unassigned plan unassigned. The status is changed only from the table.
+    const keepUnassigned =
+      mode === "edit" && form.assignmentStatus === "Not Assigned";
+    const workflowStatus = keepUnassigned ? "UNASSIGN" : "Assigned";
     const nextForm = {
       ...form,
       dietTemplateId: String(form.dietTemplateId),
@@ -455,7 +482,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
       dietTypeId: Number(nextForm.dietTypeId),
       dietTemplateId: Number(nextForm.dietTemplateId),
       planId: nextForm.id || existingFlow?.planId || null,
-      status: workflowStatus,
+      status: keepUnassigned ? "Not Assigned" : workflowStatus,
       endDate: nextForm.endDate || "",
       planName: nextForm.planName,
       startDate: nextForm.startDate,
@@ -531,6 +558,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
       if (!loadedPlans) {
         throw new Error("The plan was saved, but the list could not refresh.");
       }
+      loadSummary(appliedFilters);
       let loadedPlan = loadedPlans.find(
         (plan) => String(plan.id) === String(savedId),
       );
@@ -702,8 +730,15 @@ export default function DietManagerReference({ embedded = false } = {}) {
       return;
     }
     const p = patient(x.patientId);
+    const templateId =
+      x.dietTemplateId ||
+      dietTemplates.find((t) => String(t.dietTypeId) === String(x.dietTypeId))
+        ?.id ||
+      "";
     setForm({
       ...x,
+      dietTemplateId: templateId ? String(templateId) : "",
+      planName: x.planName || diet(templateId)?.name || "",
       allergensText: (p?.allergens || [])
         .filter((a) => a && a !== "None")
         .join(", "),
@@ -739,11 +774,90 @@ export default function DietManagerReference({ embedded = false } = {}) {
             "The plan was deleted, but the list could not refresh.",
           );
         }
+        loadSummary(appliedFilters);
         setToast("Diet plan deleted.");
       } catch (error) {
         console.error("Diet plan delete failed", error);
         setToast(error?.message || "Unable to delete the diet plan.");
       }
+    }
+  };
+
+  const openAssignForm = (row) => {
+    const p = patient(row.patientId);
+    setForm({
+      ...blank,
+      patientId: String(row.patientId),
+      dietTypeId: String(p?.dietTypeId || ""),
+      dietTemplateId: String(
+        dietTemplates.find(
+          (t) => Number(t.dietTypeId) === Number(p?.dietTypeId),
+        )?.id || "",
+      ),
+      allergensText: (p?.allergens || [])
+        .filter((a) => a && a !== "None")
+        .join(", "),
+      specialInstructions: p?.specialInstructions || "",
+      intestinalDetails: p?.intestinalDetails || p?.intestinalDetail || "",
+      bedDetails: `${p?.ward || ""} / ${p?.bedNo || p?.bed || ""}`.trim(),
+    });
+    setMode("create");
+  };
+
+  const toggleAssignment = async (x) => {
+    if (x.auto || x.id == null || saving) return;
+    const makeAssigned = x.assignmentStatus !== "Assigned";
+    if (!makeAssigned && !confirm("Unassign this diet plan?")) return;
+    setSaving(true);
+    try {
+      const response = await patientDietPlanService.updateAssignment(x.id, {
+        dietTypeId: x.dietTypeId,
+        dietitionPractId: 0,
+        assignmentStatus: makeAssigned ? "ASSIGN" : "UNASSIGN",
+      });
+      if (
+        response?.error ||
+        response?.statusCode >= 400 ||
+        response?.status >= 400
+      ) {
+        throw new Error(
+          response?.message ||
+            response?.error?.message ||
+            "The server rejected the status change.",
+        );
+      }
+      const loadedPlans = await loadData();
+      if (!loadedPlans)
+        throw new Error("Status updated, but the list could not refresh.");
+      loadSummary(appliedFilters);
+      const flows = getStore("hd_diet_workflow", []) || [];
+      setStore(
+        "hd_diet_workflow",
+        flows.map((f) =>
+          String(f.patientId) === String(x.patientId)
+            ? {
+                ...f,
+                status: makeAssigned ? "Assigned" : "Not Assigned",
+                updatedAt: new Date().toISOString(),
+              }
+            : f,
+        ),
+      );
+      appendHistoryEvent({
+        type: "diet_plan",
+        module: "Diet Manager",
+        action: makeAssigned ? "Diet Plan Assigned" : "Diet Plan Unassigned",
+        patientId: x.patientId,
+        patientName: patient(x.patientId)?.name || "",
+        planId: x.id,
+        dietTypeId: x.dietTypeId || null,
+      });
+      setToast(makeAssigned ? "Diet plan assigned." : "Diet plan unassigned.");
+    } catch (error) {
+      console.error("Assignment status change failed", error);
+      setToast(error?.message || "Unable to change the assignment status.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -770,6 +884,22 @@ export default function DietManagerReference({ embedded = false } = {}) {
           <p className="text-sm text-slate-500" role="status">
             Loading Diet Manager data…
           </p>
+        )}
+        {summary && (
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Object.entries(summary?.data ?? summary)
+              .filter(([, value]) => typeof value === "number")
+              .map(([key, value]) => (
+                <div key={key} className="hospital-stat-card">
+                  <div>
+                    <p className="hospital-stat-label">
+                      {key.replace(/([a-z])([A-Z])/g, "$1 $2")}
+                    </p>
+                    <p className="hospital-stat-value">{value}</p>
+                  </div>
+                </div>
+              ))}
+          </section>
         )}
         <div className="hospital-card" data-card-style="outlined">
           <div className="hospital-card-header">
@@ -939,17 +1069,26 @@ export default function DietManagerReference({ embedded = false } = {}) {
             {
               key: "assignmentStatus",
               label: "Assignment Status",
-              render: (row) => (
-                <span
-                  className={`hospital-status ${
-                    row.assignmentStatus === "Assigned"
-                      ? "hospital-status-active"
-                      : "hospital-status-inactive"
-                  }`}
-                >
-                  {row.assignmentStatus}
-                </span>
-              ),
+              render: (row) => {
+                const assigned = row.assignmentStatus === "Assigned";
+                return (
+                  <button
+                    type="button"
+                    title={assigned ? "Click to unassign" : "Click to assign"}
+                    disabled={saving}
+                    onClick={() =>
+                      row.auto ? openAssignForm(row) : toggleAssignment(row)
+                    }
+                    className={`hospital-status cursor-pointer transition hover:opacity-80 ${
+                      assigned
+                        ? "hospital-status-active"
+                        : "hospital-status-inactive"
+                    }`}
+                  >
+                    {row.assignmentStatus}
+                  </button>
+                );
+              },
             },
             {
               key: "startDate",
@@ -1060,12 +1199,12 @@ export default function DietManagerReference({ embedded = false } = {}) {
 
                   <span
                     className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                      mode === "edit"
+                      mode === "edit" && formIsAssigned
                         ? "bg-emerald-100 text-emerald-800"
                         : "bg-slate-100 text-slate-700"
                     }`}
                   >
-                    {mode === "edit" ? "ASSIGNED" : "NEW ASSIGNMENT"}
+                    {mode === "edit" ? statusLabel : "NEW ASSIGNMENT"}
                   </span>
                 </div>
 
@@ -1397,8 +1536,14 @@ export default function DietManagerReference({ embedded = false } = {}) {
                         {/* Status */}
                         <div className="col-span-4 text-xs font-semibold text-slate-700">
                           Assignment Status
-                          <div className="mt-1 flex h-[38px] items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-800">
-                            ASSIGNED
+                          <div
+                            className={`mt-1 flex h-[38px] items-center rounded-md border px-3 text-xs font-bold ${
+                              formIsAssigned
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                : "border-slate-200 bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {statusLabel}
                           </div>
                         </div>
 
