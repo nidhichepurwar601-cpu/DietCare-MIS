@@ -1139,7 +1139,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
               className: "text-right",
               render: (row) => (
                 <div className="flex justify-end gap-2">
-                  {/*  <button
+                   <button
                     title="View meal plan"
                     type="button"
                     onClick={(event) => {
@@ -1160,7 +1160,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
                     className="icon-btn"
                   >
                     <Eye size={16} />
-                  </button> */}
+                  </button> 
                   <button
                     title={
                       row.assignmentStatus === "Assigned"
