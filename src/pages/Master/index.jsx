@@ -7,8 +7,8 @@ import HospitalPage from "../../components/common/HospitalPage.jsx";
 
 const TABS = [
   { id: "dietTemplate", label: "Diet Templates" }, // pick one name and use it everywhere
-  { id: "mealTypes",    label: "Meal Types" },
-  { id: "foodMaster",   label: "Food Master" },
+  { id: "mealTypes", label: "Meal Time" },
+  { id: "foodMaster", label: "Food Master" },
 ];
 
 export default function Master() {
@@ -22,7 +22,12 @@ export default function Master() {
         description="Configure diet plans, meal schedules and food items."
       >
         <div className="hospital-card" style={{ marginBottom: 0, padding: 0 }}>
-          <div className="hospital-tabs" style={{ padding: "var(--space-2) var(--space-4) 0 var(--space-4)" }}>
+          <div
+            className="hospital-tabs"
+            style={{
+              padding: "var(--space-2) var(--space-4) 0 var(--space-4)",
+            }}
+          >
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -39,8 +44,8 @@ export default function Master() {
 
           <div style={{ padding: "var(--space-4)" }}>
             {active === "dietTemplate" && <DietTemplateTab />}
-            {active === "mealTypes"    && <MealTypesTab />}
-            {active === "foodMaster"   && <FoodMasterTab />}
+            {active === "mealTypes" && <MealTypesTab />}
+            {active === "foodMaster" && <FoodMasterTab />}
           </div>
         </div>
       </HospitalPage>

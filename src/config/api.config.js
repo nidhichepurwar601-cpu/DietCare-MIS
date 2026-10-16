@@ -184,6 +184,7 @@ const ENDPOINTS = {
     UPDATE_BY_ID:  (id) => `/dietmanager/update/${id}`,
     DELETE:        (id) => `/dietmanager/delete/${id}`,
     UPDATE_STATUS: (id) => `/dietmanager/update/status/${id}`,
+    VIEW_BUTTON:      (id) => `/dietmanager/get/by/${id}`,
   },
   CLINICAL_ALERT: {
     CREATE:       '/clinicalalert/create',

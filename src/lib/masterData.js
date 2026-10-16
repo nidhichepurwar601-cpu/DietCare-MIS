@@ -347,19 +347,22 @@ async function loadMasterDataFromApi() {
     };
   });
 
-  const { mappings, mappingWarnings } = await loadMappings(dietTemplates);
+  // Meal items (one GET per template) are loaded separately by
+  // loadMasterData({ withMappings: true }) so pages that do not need them
+  // do not trigger those calls.
   return {
     patients,
     dietTypes,
     dietTemplates,
     mealTypes,
     foods,
-    mappings,
-    mappingWarnings,
+    mappings: [],
+    mappingWarnings: [],
+    mappingsLoaded: false,
   };
 }
 
-export function loadMasterData() {
+function loadBaseMasterData() {
   const generation = getApiCacheGeneration();
   if (
     masterDataCache &&
@@ -390,4 +393,17 @@ export function loadMasterData() {
     });
   pendingMasterData = { generation, promise };
   return promise;
+}
+
+// withMappings: false  -> patients, types, templates, meal types, foods only.
+// withMappings: true   -> also loads meal items for every template
+//                         (GET diettemplate/item/get/by/template/{id} each).
+export async function loadMasterData({ withMappings = true } = {}) {
+  const base = await loadBaseMasterData();
+  if (!withMappings || base.mappingsLoaded) return base;
+
+  const { mappings, mappingWarnings } = await loadMappings(base.dietTemplates);
+  const full = { ...base, mappings, mappingWarnings, mappingsLoaded: true };
+  if (masterDataCache) masterDataCache.data = full;
+  return full;
 }

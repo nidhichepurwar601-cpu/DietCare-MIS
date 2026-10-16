@@ -33,8 +33,7 @@ import dietTemplateService from "../../services/dietTemplateService.js";
 import templateItemService from "../../services/templateItemService.js";
 import foodService from "../../services/foodService.js";
 import foodNutritionService from "../../services/foodNutritionService.js";
-import { loadTemplateMappings } from "../../lib/masterData.js";
-
+import { loadMasterData, loadTemplateMappings } from "../../lib/masterData.js";
 
 const MEAL_NAMES = [
   "Breakfast",
@@ -44,8 +43,6 @@ const MEAL_NAMES = [
   "Dinner",
   "Bedtime",
 ];
-
-
 
 function normalizeMealFoodUnit(unit) {
   const normalized = normalizeUnit(unit);
@@ -994,6 +991,10 @@ export default function DietTemplateTab() {
       alert("Diet Template Code is required.");
       return null;
     }
+    if (!payload.dietTypeId) {
+      alert("Select the Diet Plan this template belongs to.");
+      return null;
+    }
     if (
       !Number.isFinite(payload.targetCalories) ||
       payload.targetCalories < 0
@@ -1698,6 +1699,23 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
   const [loadingTemplateItems, setLoadingTemplateItems] =
     useState(!isNewTemplate);
   const [templateItemLoadError, setTemplateItemLoadError] = useState("");
+  const [dietTypeOptions, setDietTypeOptions] = useState(
+    () => getStore(KEYS.DIET_TYPES, []) || [],
+  );
+
+  useEffect(() => {
+    let active = true;
+    loadMasterData()
+      .then((master) => {
+        if (active && Array.isArray(master?.dietTypes)) {
+          setDietTypeOptions(master.dietTypes);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (isNewTemplate) return undefined;
@@ -1973,6 +1991,28 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
               onChange={(e) => setForm({ ...form, code: e.target.value })}
               className="hospital-input"
             />
+          </div>
+          <div>
+            <label
+              className="hospital-label"
+              style={{ display: "block", marginBottom: "var(--space-1)" }}
+            >
+              Diet Plan
+            </label>
+            <select
+              value={form.dietTypeId ?? ""}
+              onChange={(e) => setForm({ ...form, dietTypeId: e.target.value })}
+              className="hospital-select"
+            >
+              <option value="">Select diet plan</option>
+              {dietTypeOptions
+                .filter((t) => t.status !== false)
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+            </select>
           </div>
           <div>
             <label

@@ -7,19 +7,15 @@ import {
   getRoleHomePath,
   hasPermission,
 } from "./lib/permissions.js";
-import {
-  setStore,
-  clearLegacyAppStorage,
-  KEYS,
-} from "./lib/storage.js";
+import { setStore, clearLegacyAppStorage, KEYS } from "./lib/storage.js";
 import patientDietPlanService from "./services/patientDietPlanService.js";
 import { loadMasterData } from "./lib/masterData.js";
 import { extractPlanRows, fromApiRow } from "./services/dietPlanAdapter.js";
 import AccessGuard from "./components/common/AccessGuard.jsx";
 
 const PatientManagement = lazy(() => import("./pages/Dashboard/index.jsx"));
-const DietaryOperationsDashboard = lazy(() =>
-  import("./pages/OperationsDashboard/index.jsx"),
+const DietaryOperationsDashboard = lazy(
+  () => import("./pages/OperationsDashboard/index.jsx"),
 );
 const Master = lazy(() => import("./pages/Master/index.jsx"));
 const Reports = lazy(() => import("./pages/Reports/index.jsx"));
@@ -31,15 +27,19 @@ const Settings = lazy(() => import("./pages/Settings.jsx"));
 // const Signup = lazy(() => import("./pages/Signup.jsx"));
 // const ForgotPassword = lazy(() => import("./pages/ForgotPassword.jsx"));
 const DietPlans = lazy(() => import("./pages/DietPlans/index.jsx"));
-const KitchenOperations = lazy(() => import("./pages/KitchenOperations/index.jsx"));
-const MealDistribution = lazy(() => import("./pages/MealDistribution/index.jsx"));
+const KitchenOperations = lazy(
+  () => import("./pages/KitchenOperations/index.jsx"),
+);
+const MealDistribution = lazy(
+  () => import("./pages/MealDistribution/index.jsx"),
+);
 const ClinicalAlerts = lazy(() => import("./pages/ClinicalAlerts/index.jsx"));
 const IntakeUpdate = lazy(() => import("./pages/IntakeUpdate/index.jsx"));
 
 async function syncApplicationDataFromBackend() {
   try {
     const [master, planResponse] = await Promise.all([
-      loadMasterData(),
+      loadMasterData({ withMappings: false }),
       patientDietPlanService.getAllPlans({
         ward: "",
         dietPlan: "",
@@ -70,7 +70,6 @@ async function syncApplicationDataFromBackend() {
     setStore(KEYS.DIET_TEMPLATES, master.dietTemplates);
     setStore(KEYS.MEAL_TYPES, master.mealTypes);
     setStore(KEYS.FOOD_MASTER, master.foods);
-    setStore(KEYS.DIET_MAPPING, master.mappings);
     const workflows = master.patients.flatMap((patient) => {
       const plan = plans.find(
         (row) => String(row.patientId) === String(patient.id),
@@ -125,6 +124,32 @@ async function syncApplicationDataFromBackend() {
   }
 }
 
+// Loads meal items (mappings) only for pages that read them.
+const WithMappings = ({ children }) => {
+  const [mappingsReady, setMappingsReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    loadMasterData()
+      .then((master) => setStore(KEYS.DIET_MAPPING, master.mappings))
+      .catch((error) => console.error("Could not load meal mappings.", error))
+      .finally(() => active && setMappingsReady(true));
+    return () => {
+      active = false;
+    };
+  }, []);
+  if (!mappingsReady) {
+    return (
+      <div className="app-boot">
+        <div className="app-boot-card">
+          <div className="app-boot-mark">D</div>
+          <div>Loading meal data…</div>
+        </div>
+      </div>
+    );
+  }
+  return children;
+};
+
 const RequireAuth = ({ children }) => {
   // Login is commented out: keep a working admin session so the app can open.
   if (!getSession()) ensureDevAdminSession();
@@ -167,7 +192,9 @@ function App() {
     let active = true;
     const initialize = async () => {
       const urlParams = new URLSearchParams(window.location.search);
-      const token = urlParams.get("token") || "SmartCare eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJkZW1vZDEyMzQiLCJjbGluaWMiOiJhdXJldXMiLCJleHAiOjE3OTE0NjgyNjgsImlhdCI6MTc5MTQ0NjY2OH0.OVO7Jm9BDv-1UJQ7gP5xOAJDV3IWY4G7nhzAIsXwhEiqDuCrNbPnTi88VBvI5-uI2Vdsa0R6cE9GMy8n1jdheA";
+      const token =
+        urlParams.get("token") ||
+        "SmartCare eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJkZW1vZDEyMzQiLCJjbGluaWMiOiJhdXJldXMiLCJleHAiOjE3OTE0NjgyNjgsImlhdCI6MTc5MTQ0NjY2OH0.OVO7Jm9BDv-1UJQ7gP5xOAJDV3IWY4G7nhzAIsXwhEiqDuCrNbPnTi88VBvI5-uI2Vdsa0R6cE9GMy8n1jdheA";
       const userId = urlParams.get("userId") || "demo1234";
       const clinicId = urlParams.get("clinicId") || "aureus";
       const zoneId = urlParams.get("zoneId") || "Asia/Kolkata";
@@ -176,7 +203,7 @@ function App() {
       if (clinicId) sessionStorage.setItem("ClinicId", clinicId);
       if (zoneId) sessionStorage.setItem("ZONEID", zoneId);
       if (token || userId || clinicId || zoneId) {
-                const cleanPath = window.location.pathname.replace(/^\/+/, '/') || '/';
+        const cleanPath = window.location.pathname.replace(/^\/+/, "/") || "/";
         window.history.replaceState({}, document.title, cleanPath);
       }
       clearLegacyAppStorage();
@@ -257,98 +284,116 @@ function App() {
           </div>
         }
       >
-      <Routes>
-        <Route path="/" element={<RoleAwareHome />} />
-        <Route
-          path="/patients"
-          element={
-            <Guarded permission={PERMISSIONS.PATIENT_VIEW}>
-              <PatientManagement />
-            </Guarded>
-          }
-        />
-        <Route
-          path="/master"
-          element={
-            <Guarded permission={PERMISSIONS.MASTER_VIEW}>
-              <Master />
-            </Guarded>
-          }
-        />
-        <Route
-          path="/diet-plans"
-          element={
-            <Guarded permission={PERMISSIONS.DIET_PLAN_VIEW}>
-              <DietPlans />
-            </Guarded>
-          }
-        />
-        <Route
-          path="/kitchen-operations"
-          element={
-            <Guarded permission={PERMISSIONS.KITCHEN_VIEW}>
-              <KitchenOperations />
-            </Guarded>
-          }
-        />
-        <Route
-          path="/meal-delivery"
-          element={
-            <Guarded permission={PERMISSIONS.DELIVERY_VIEW}>
-              <MealDistribution />
-            </Guarded>
-          }
-        />
-        <Route
-          path="/intake-update/:patientId"
-          element={
-            <Guarded permission={PERMISSIONS.INTAKE_VIEW}>
-              <IntakeUpdate />
-            </Guarded>
-          }
-        />
-        <Route
-          path="/clinical-alerts"
-          element={
-            <Guarded permission={PERMISSIONS.ALERTS_VIEW}>
-              <ClinicalAlerts />
-            </Guarded>
-          }
-        />
-        <Route
-          path="/reports"
-          element={
-            <Guarded permission={PERMISSIONS.REPORT_VIEW}>
-              <Reports />
-            </Guarded>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <RequireAuth>
-              <Profile />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <RequireAuth>
-              <Settings />
-            </RequireAuth>
-          }
-        />
-        {/* AUTH SCREENS TEMPORARILY DISABLED
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <WithMappings>
+                <RoleAwareHome />
+              </WithMappings>
+            }
+          />
+          <Route
+            path="/patients"
+            element={
+              <Guarded permission={PERMISSIONS.PATIENT_VIEW}>
+                <PatientManagement />
+              </Guarded>
+            }
+          />
+          <Route
+            path="/master"
+            element={
+              <Guarded permission={PERMISSIONS.MASTER_VIEW}>
+                <Master />
+              </Guarded>
+            }
+          />
+          <Route
+            path="/diet-plans"
+            element={
+              <Guarded permission={PERMISSIONS.DIET_PLAN_VIEW}>
+                <DietPlans />
+              </Guarded>
+            }
+          />
+          <Route
+            path="/kitchen-operations"
+            element={
+              <Guarded permission={PERMISSIONS.KITCHEN_VIEW}>
+                <WithMappings>
+                  <KitchenOperations />
+                </WithMappings>
+              </Guarded>
+            }
+          />
+          <Route
+            path="/meal-delivery"
+            element={
+              <Guarded permission={PERMISSIONS.DELIVERY_VIEW}>
+                <WithMappings>
+                  <MealDistribution />
+                </WithMappings>
+              </Guarded>
+            }
+          />
+          <Route
+            path="/intake-update/:patientId"
+            element={
+              <Guarded permission={PERMISSIONS.INTAKE_VIEW}>
+                <WithMappings>
+                  <IntakeUpdate />
+                </WithMappings>
+              </Guarded>
+            }
+          />
+          <Route
+            path="/clinical-alerts"
+            element={
+              <Guarded permission={PERMISSIONS.ALERTS_VIEW}>
+                <ClinicalAlerts />
+              </Guarded>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <Guarded permission={PERMISSIONS.REPORT_VIEW}>
+                <WithMappings>
+                  <Reports />
+                </WithMappings>
+              </Guarded>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <RequireAuth>
+                <Profile />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <RequireAuth>
+                <Settings />
+              </RequireAuth>
+            }
+          />
+          {/* AUTH SCREENS TEMPORARILY DISABLED
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         */}
-        <Route path="/login" element={<Navigate to="/" replace />} />
-        <Route path="/signup" element={<Navigate to="/" replace />} />
-        <Route path="/forgot-password" element={<Navigate to="/" replace />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/signup" element={<Navigate to="/" replace />} />
+          <Route
+            path="/forgot-password"
+            element={<Navigate to="/" replace />}
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </Suspense>
     </BrowserRouter>
   );

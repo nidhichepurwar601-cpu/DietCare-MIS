@@ -17,7 +17,7 @@ import {
   X,
   CalendarDays,
 } from "lucide-react";
-import MealPlanModal from "../../components/common/MealPlanModal.jsx";
+//import MealPlanModal from "../../components/common/MealPlanModal.jsx";
 import {
   getStore,
   setStore,
@@ -26,7 +26,7 @@ import {
   getLocalDateKey,
 } from "../../lib/storage.js";
 import { getClinicalAlertsForPatient } from "../../lib/clinicalAlerts.js";
-import { loadMasterData } from "../../lib/masterData.js";
+import { loadMasterData, loadTemplateMappings } from "../../lib/masterData.js";
 import patientDietPlanService from "../../services/patientDietPlanService.js";
 import {
   extractPlanId,
@@ -39,6 +39,7 @@ import {
   exportCsv,
   EmptyState,
 } from "../../components/common/MvpTools.jsx";
+import Modal from "../../components/common/Modal.jsx";
 
 const PLAN_KEY = "hd_diet_plans";
 const currentUserId = () => Number(sessionStorage.getItem("UserId")) || 0;
@@ -184,7 +185,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
     setLoadError("");
     try {
       const [master, planResponse] = await Promise.all([
-        loadMasterData(),
+        loadMasterData({ withMappings: false }),
         patientDietPlanService.getAllPlans(),
       ]);
       if (
@@ -224,7 +225,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
       setStore(KEYS.DIET_TEMPLATES, master.dietTemplates);
       setStore(KEYS.MEAL_TYPES, master.mealTypes);
       setStore(KEYS.FOOD_MASTER, master.foods);
-      setStore(KEYS.DIET_MAPPING, master.mappings);
+      //setStore(KEYS.DIET_MAPPING, master.mappings);
       setPlans(planRows);
       setStore(PLAN_KEY, planRows);
       return planRows;
@@ -276,6 +277,8 @@ export default function DietManagerReference({ embedded = false } = {}) {
   const diet = (id) => dietTemplates.find((x) => String(x.id) === String(id));
   const selectedPatient = patient(form.patientId);
   // Read-only status shown in the Edit modal. It follows the table row.
+  // Single rule used everywhere: a diet template selected = Assigned,
+  // no diet template = Unassigned.
   const formIsAssigned = Boolean(form.dietTemplateId);
   const statusLabel = formIsAssigned ? "ASSIGNED" : "UNASSIGNED";
   // Pregnancy workflow is only applicable to female patients; API data may still contain a stale flag for others.
@@ -377,16 +380,20 @@ export default function DietManagerReference({ embedded = false } = {}) {
         const flow = workflows.find(
           (x) => String(x.patientId) === String(p.id),
         );
-        const planStatus = String(plan?.status || "")
-          .replace(/\s+/g, "")
-          .toUpperCase();
-        const planUnassigned = [
-          "UNASSIGN",
-          "UNASSIGNED",
-          "NOTASSIGNED",
-        ].includes(planStatus);
+        // Same lookup as the Edit popup: saved template id, otherwise the
+        // template that matches the plan's diet type.
+        const planTemplateId = plan
+          ? plan.dietTemplateId ||
+            dietTemplates.find(
+              (t) =>
+                String(t.dietTypeId) === String(plan.dietTypeId) &&
+                t.status !== false &&
+                t.status !== "Inactive",
+            )?.id ||
+            ""
+          : "";
         const assigned = plan
-          ? !planUnassigned
+          ? Boolean(planTemplateId)
           : [
               "Assigned",
               "Approved",
@@ -406,6 +413,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
             planName: "",
           }),
           patientId: p.id,
+          dietTemplateId: planTemplateId ? String(planTemplateId) : "",
           assignmentStatus: assigned ? "Assigned" : "Unassigned",
           status: assigned ? "Assigned" : "Unassigned",
           workflowStatus: flow?.status || "Unassigned",
@@ -439,7 +447,7 @@ export default function DietManagerReference({ embedded = false } = {}) {
           appliedFilters.status === "All Status" ||
           x.assignmentStatus === appliedFilters.status,
       );
-  }, [patients, plans, workflows, appliedFilters]);
+  }, [patients, plans, workflows, appliedFilters, dietTemplates]);
   const persist = (x) => {
     setPlans(x);
     setStore(PLAN_KEY, x);
@@ -553,13 +561,23 @@ export default function DietManagerReference({ embedded = false } = {}) {
         ? await patientDietPlanService.updatePlanById(
             form.id,
             toDietPlanApiPayload(
-              { ...nextForm, status: apiStatus, dietitianPractId: currentUserId() },
+              {
+                ...nextForm,
+                status: apiStatus,
+                dietitianPractId:
+                  Number(nextForm.dietitianPractId) || currentUserId(),
+              },
               { template: selectedDietTemplate, isUpdate: true },
             ),
           )
         : await patientDietPlanService.createPlan(
             toDietPlanApiPayload(
-              { ...nextForm, status: apiStatus, dietitianPractId: currentUserId() },
+              {
+                ...nextForm,
+                status: apiStatus,
+                dietitianPractId:
+                  Number(nextForm.dietitianPractId) || currentUserId(),
+              },
               { template: selectedDietTemplate },
             ),
           );
@@ -893,6 +911,30 @@ export default function DietManagerReference({ embedded = false } = {}) {
     }
   };
 
+  const viewPastDietPlan = (() => {
+    if (!selected) return null;
+    const stored = Array.isArray(selected.dietHistory)
+      ? selected.dietHistory[selected.dietHistory.length - 1]
+      : null;
+    return (
+      stored ||
+      plans
+        .filter(
+          (p) =>
+            String(p.patientId) === String(selected.patientId) &&
+            String(p.id) !== String(selected.id) &&
+            String(p.dietTypeId) !== String(selected.dietTypeId),
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.startDate || 0).getTime() -
+            new Date(a.startDate || 0).getTime(),
+        )[0] ||
+      null
+    );
+  })();
+  const viewPastDietName = diet(viewPastDietPlan?.dietTypeId)?.name || "";
+
   const content = (
     <>
       <Toast message={toast} type={toastType} onClose={() => setToastRaw("")} />
@@ -921,16 +963,31 @@ export default function DietManagerReference({ embedded = false } = {}) {
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {Object.entries(summary?.data ?? summary)
               .filter(([, value]) => typeof value === "number")
-              .map(([key, value]) => (
-                <div key={key} className="hospital-stat-card">
-                  <div>
-                    <p className="hospital-stat-label">
-                      {key.replace(/([a-z])([A-Z])/g, "$1 $2")}
-                    </p>
-                    <p className="hospital-stat-value">{value}</p>
+              .map(([key, backendValue]) => {
+                // Keep the cards in sync with the table: Total / Assigned /
+                // Unassigned are counted from the rows being displayed.
+                // (Planning keeps the backend value.)
+                const k = key.toLowerCase();
+                const value = k.includes("unassign")
+                  ? rows.filter((r) => r.assignmentStatus === "Unassigned")
+                      .length
+                  : k.includes("assign")
+                    ? rows.filter((r) => r.assignmentStatus === "Assigned")
+                        .length
+                    : k.includes("total")
+                      ? rows.length
+                      : backendValue;
+                return (
+                  <div key={key} className="hospital-stat-card">
+                    <div>
+                      <p className="hospital-stat-label">
+                        {key.replace(/([a-z])([A-Z])/g, "$1 $2")}
+                      </p>
+                      <p className="hospital-stat-value">{value}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
           </section>
         )}
         <div className="hospital-card" data-card-style="outlined">
@@ -1139,28 +1196,24 @@ export default function DietManagerReference({ embedded = false } = {}) {
               className: "text-right",
               render: (row) => (
                 <div className="flex justify-end gap-2">
-                   <button
+                  <button
                     title="View meal plan"
                     type="button"
                     onClick={(event) => {
                       event.preventDefault();
-                      setSelected({
-                        ...row,
-                        dietTypeId: Number(row.dietTypeId),
-                        dietTemplateId:
-                          row.dietTemplateId ||
-                          dietTemplates.find(
-                            (t) =>
-                              Number(t.dietTypeId) === Number(row.dietTypeId),
-                          )?.id ||
-                          "",
-                      });
+                      if (row.auto) {
+                        setToast(
+                          "No diet plan created yet. Use the pencil button to create one.",
+                        );
+                        return;
+                      }
+                      setSelected(row);
                       setMode("view");
                     }}
                     className="icon-btn"
                   >
                     <Eye size={16} />
-                  </button> 
+                  </button>
                   <button
                     title={
                       row.assignmentStatus === "Assigned"
@@ -1824,15 +1877,16 @@ export default function DietManagerReference({ embedded = false } = {}) {
       ) : null}
       {/* Show meal plan template when viewing a plan (patient details removed) */}
       {mode === "view" && selected && (
-        <MealPlanModal
-          isOpen={true}
-          onClose={() => setMode("")}
-          diet={diet(selected.dietTemplateId)}
-          mappings={mappings}
+        <DietPlanViewModal
+          planId={selected.id}
+          row={selected}
+          patientRecord={patient(selected.patientId)}
+          template={diet(selected.dietTemplateId)}
+          pastDietName={viewPastDietName}
+          dietTemplates={dietTemplates}
           mealTypes={mealTypes}
           foods={foods}
-          allergens={patient(selected.patientId)?.allergens || ["None"]}
-          patientId={selected.patientId || null}
+          onClose={() => setMode("")}
         />
       )}
 
@@ -1953,3 +2007,411 @@ const Info = ({ l, v }) => (
     <div className="mt-1 font-medium">{v || "—"}</div>
   </div>
 );
+const VIEW_STATUS = {
+  ASSIGN: { label: "Assigned", cls: "hospital-status-assigned" },
+  PLANNING: { label: "Planning", cls: "hospital-status-planning" },
+  UNASSIGN: { label: "Unassigned", cls: "hospital-status-inactive" },
+};
+const vNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const vDash = (v) => (v === null || v === undefined || v === "" ? "—" : v);
+const vDate = (s) => {
+  if (!s) return "—";
+  const d = new Date(`${s}T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? s
+    : d.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+};
+
+const ViewRow = ({ label, value }) => (
+  <div style={{ minWidth: 0 }}>
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        color: "var(--text-secondary)",
+      }}
+    >
+      {label}
+    </div>
+    <div
+      style={{
+        marginTop: 2,
+        fontWeight: 500,
+        color: "var(--text-primary)",
+        overflowWrap: "anywhere",
+      }}
+    >
+      {vDash(value)}
+    </div>
+  </div>
+);
+
+const ViewSection = ({ title, children }) => (
+  <section
+    style={{
+      border: "1px solid var(--border)",
+      borderRadius: "var(--radius)",
+      background: "var(--hospital-card)",
+      padding: 16,
+    }}
+  >
+    <h3 style={{ margin: "0 0 8px", fontWeight: 700 }}>{title}</h3>
+    {children}
+  </section>
+);
+
+const ViewMacro = ({ label, grams, percent, kcal, color }) => (
+  <div style={{ flex: 1, minWidth: 110 }}>
+    <div style={{ color: "var(--text-secondary)" }}>{label}</div>
+    <div style={{ fontSize: 22, fontWeight: 700 }}>
+      {Math.round(vNum(grams))} g
+    </div>
+    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+      {vNum(percent)}% · {Math.round(vNum(kcal))} kcal
+    </div>
+    <div
+      aria-hidden
+      style={{
+        height: 4,
+        borderRadius: 2,
+        background: color,
+        marginTop: 6,
+        width: `${Math.min(100, vNum(percent))}%`,
+      }}
+    />
+  </div>
+);
+
+function DietPlanViewModal({
+  planId,
+  row,
+  patientRecord,
+  template,
+  pastDietName,
+  dietTemplates = [],
+  mealTypes = [],
+  foods = [],
+  onClose,
+}) {
+  const [plan, setPlan] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [fallback, setFallback] = useState({ template: null, meals: [] });
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    patientDietPlanService
+      .getPlanById(planId)
+      .then((res) => {
+        if (!active) return;
+        if (!res?.data)
+          throw new Error(res?.message || "Plan details were not returned.");
+        setPlan(res.data);
+      })
+      .catch(
+        (e) => active && setError(e?.message || "Could not load plan details."),
+      )
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [planId]);
+
+  useEffect(() => {
+    if (!plan) return undefined;
+    if (Array.isArray(plan.meals) && plan.meals.length) {
+      setFallback({ template: null, meals: [] });
+      return undefined;
+    }
+    const template =
+      dietTemplates.find((t) => String(t.id) === String(plan.dietTemplateId)) ||
+      dietTemplates.find(
+        (t) =>
+          Number(t.dietTypeId) === Number(plan.dietTypeId) &&
+          t.status !== false &&
+          t.status !== "Inactive",
+      );
+    if (!template) return undefined;
+
+    let active = true;
+    loadTemplateMappings(
+      template.templateId ?? template.id,
+      template.dietTypeId,
+    )
+      .then((mappings) => {
+        if (!active) return;
+        const meals = mappings
+          .map((m) => {
+            const mealType =
+              mealTypes.find((t) => Number(t.id) === Number(m.mealTypeId)) ||
+              mealTypes.find(
+                (t) =>
+                  String(t.name || "").toLowerCase() ===
+                  String(m.mealName || "").toLowerCase(),
+              );
+            const items = (Array.isArray(m.foodItems) ? m.foodItems : [])
+              .map((entry) => {
+                const foodId =
+                  typeof entry === "object"
+                    ? (entry?.foodId ?? entry?.id)
+                    : entry;
+                const food = foods.find((f) => Number(f.id) === Number(foodId));
+                if (!food) return null;
+                return {
+                  id: food.id,
+                  name: food.name,
+                  quantity:
+                    (typeof entry === "object" ? entry?.quantity : null) ??
+                    m.quantityTexts?.[foodId] ??
+                    m.quantities?.[foodId] ??
+                    food.standardQuantity ??
+                    "",
+                  unit:
+                    (typeof entry === "object" ? entry?.unit : null) ||
+                    m.units?.[foodId] ||
+                    food.unit ||
+                    "",
+                };
+              })
+              .filter(Boolean);
+            return {
+              id: m.id ?? m.mealTypeId,
+              name: mealType?.name || m.mealName || "Meal",
+              time: mealType?.time || "",
+              sort: Number(m.mealTypeId || mealType?.id || 0),
+              items,
+            };
+          })
+          .filter((m) => m.items.length)
+          .sort((a, b) => a.sort - b.sort);
+        setFallback({ template, meals });
+      })
+      .catch(() => active && setFallback({ template: null, meals: [] }));
+    return () => {
+      active = false;
+    };
+  }, [plan]);
+
+  // Same rules as the Edit popup.
+  const hasTemplate = Boolean(row?.dietTemplateId || plan?.dietTemplateId);
+  const isAssignedRow = hasTemplate || Boolean(fallback.template);
+  const status = isAssignedRow ? VIEW_STATUS.ASSIGN : VIEW_STATUS.UNASSIGN;
+  const pastHistoryText =
+    patientRecord?.history || patientRecord?.pastHistory || "";
+  const previousDietText = patientRecord?.pastDiet || pastDietName || "";
+  const calorieValue = patientRecord?.calorieRequirement || template?.calories;
+  const backendMeals = Array.isArray(plan?.meals)
+    ? plan.meals.map((meal, i) => ({
+        id: meal.id ?? i,
+        name:
+          meal.mealName ?? meal.mealTypeName ?? meal.name ?? `Meal ${i + 1}`,
+        time: meal.mealTime ?? meal.time ?? "",
+        items: (meal.items ?? meal.foods ?? meal.foodItems ?? []).map(
+          (it, j) => ({
+            id: it.id ?? j,
+            name: it.foodName ?? it.name,
+            quantity: it.quantity ?? "",
+            unit: it.unit ?? "",
+          }),
+        ),
+      }))
+    : [];
+  const shownMeals = backendMeals.length ? backendMeals : fallback.meals;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-2 sm:p-3"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="flex max-h-[88vh] w-full max-w-[1250px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        {/* HEADER */}
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
+          <div>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-bold text-slate-900">
+                Diet Plan Details
+              </h2>
+              <span
+                className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                  isAssignedRow
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                {status.label.toUpperCase()}
+              </span>
+            </div>
+            <div className="mt-1 h-0.5 w-10 bg-emerald-600" />
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+          >
+            <X size={21} />
+          </button>
+        </div>
+
+        {/* BODY */}
+        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4">
+          {loading && (
+            <p className="text-sm text-slate-500">Loading plan details…</p>
+          )}
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              {error}
+            </div>
+          )}
+          {plan && (
+            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+              {/* LEFT COLUMN */}
+              <div className="space-y-3">
+                {/* Patient */}
+                <section className="rounded-lg border border-slate-200 bg-white p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-base font-bold text-slate-900">
+                        {plan.patientName}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {plan.patientCode} · {plan.wardBed}
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {vDate(plan.startDate)} to {vDate(plan.endDate)}
+                    </div>
+                  </div>
+                </section>
+
+                {/* Plan details */}
+                <section className="rounded-lg border border-slate-200 bg-white p-3">
+                  <h3 className="mb-3 text-sm font-bold text-emerald-700">
+                    Plan Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-x-5 gap-y-3 md:grid-cols-4">
+                    <Info l="DOCTOR" v={plan.doctorName} />
+                    <Info
+                      l="DIETITIAN"
+                      v={plan.dietitianName || "Not assigned"}
+                    />
+                    <Info l="DIAGNOSIS" v={plan.diagnosis} />
+                    <Info l="DIET TYPE" v={plan.dietTypeName} />
+                    <Info
+                      l="PAST HISTORY"
+                      v={pastHistoryText || "No past history recorded."}
+                    />
+                    <Info
+                      l="PAST DIET"
+                      v={previousDietText || "No previous diet recorded"}
+                    />
+                    <Info
+                      l="CALORIE REQUIREMENT"
+                      v={
+                        calorieValue
+                          ? `${Math.round(vNum(calorieValue))} kcal/day`
+                          : "Not recorded"
+                      }
+                    />
+                  </div>
+                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-red-700">
+                      ALLERGIES
+                    </div>
+                    <div className="mt-0.5 text-sm font-semibold text-red-900">
+                      {plan.patientAllergies || "None"}
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              {/* RIGHT COLUMN */}
+              <div className="space-y-3">
+                {/* Meal plan */}
+                <section className="rounded-lg border border-slate-200 bg-white p-3">
+                  <h3 className="text-sm font-bold text-emerald-700">
+                    Meal Plan
+                  </h3>
+                  {fallback.template && !backendMeals.length && (
+                    <p className="mb-3 text-[11px] text-slate-500">
+                      Diet template: {fallback.template.name}
+                    </p>
+                  )}
+                  {shownMeals.length ? (
+                    <div className="mt-3 grid grid-cols-1 gap-3">
+                      {shownMeals.map((meal) => (
+                        <div
+                          key={meal.id}
+                          className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                        >
+                          <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-1.5">
+                            <span className="text-sm font-bold text-slate-900">
+                              {meal.name}
+                            </span>
+                            {meal.time && (
+                              <span className="text-[11px] text-slate-500">
+                                {String(meal.time).replace(
+                                  /^(\d{2}:\d{2}):\d{2}$/,
+                                  "$1",
+                                )}
+                              </span>
+                            )}
+                          </div>
+                          {meal.items.map((item) => (
+                            <div
+                              key={item.id}
+                              className="flex items-center justify-between gap-3 py-1.5 text-xs text-slate-600"
+                            >
+                              <span className="min-w-0 flex-1 break-words">
+                                {item.name}
+                              </span>
+                              <span className="whitespace-nowrap font-semibold text-slate-800 tabular-nums">
+                                {item.quantity} {item.unit}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                      <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+                      <span>
+                        {plan.mealPlanNote ||
+                          "No meals are configured for this plan yet."}
+                      </span>
+                    </div>
+                  )}
+                </section>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER */}
+        {/* <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-white px-5 py-3">
+          <p className="text-[10px] text-slate-400">This view is read-only.</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div> */}
+      </div>
+    </div>
+  );
+}
