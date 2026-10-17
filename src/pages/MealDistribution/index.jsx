@@ -351,8 +351,7 @@ export default function MealDistribution() {
 
         const nextMeals = { ...(getStore(MEAL_STATUS_KEY, {}) || {}) };
         const nextCare = { ...(getStore(CARE_STATUS_KEY, {}) || {}) };
-        const deliveryIds =
-          getStore("hd_meal_delivery_api_ids", {}) || {};
+        const deliveryIds = getStore("hd_meal_delivery_api_ids", {}) || {};
         const deliveryItemIds =
           getStore("hd_meal_delivery_api_item_ids", {}) || {};
         apiRows.forEach((delivery) => {
@@ -403,8 +402,7 @@ export default function MealDistribution() {
         console.error("Meal delivery API refresh failed", error);
         if (active) {
           setApiError(
-            error?.message ||
-              "Could not load meal deliveries from the server.",
+            error?.message || "Could not load meal deliveries from the server.",
           );
         }
       }
@@ -478,7 +476,8 @@ export default function MealDistribution() {
         bed: row.patient.bedNo || row.patient.bed || "",
         serviceDate,
         mealTypeId: Number(mealTypeId),
-        dietTypeId: Number(row.plan?.dietTypeId || row.patient.dietTypeId) || null,
+        dietTypeId:
+          Number(row.plan?.dietTypeId || row.patient.dietTypeId) || null,
         dietTemplateId: Number(row.plan?.dietTemplateId) || null,
         dietName: row.diet?.name || row.plan?.planName || "",
         deliveryStatus: "Pending",
@@ -558,9 +557,8 @@ export default function MealDistribution() {
     const record = extractApiRecord(
       response,
       (item) =>
-        String(
-          item.id ?? item.mealDeliveryId ?? item.deliveryId ?? "",
-        ) === String(deliveryId),
+        String(item.id ?? item.mealDeliveryId ?? item.deliveryId ?? "") ===
+        String(deliveryId),
     );
     if (!record) {
       throw new Error("The server did not return the meal delivery record.");
@@ -568,9 +566,8 @@ export default function MealDistribution() {
     setStore("hd_meal_delivery_api_rows", [
       ...(getStore("hd_meal_delivery_api_rows", []) || []).filter(
         (item) =>
-          String(
-            item.id ?? item.mealDeliveryId ?? item.deliveryId,
-          ) !== String(deliveryId),
+          String(item.id ?? item.mealDeliveryId ?? item.deliveryId) !==
+          String(deliveryId),
       ),
       record,
     ]);
@@ -651,9 +648,7 @@ export default function MealDistribution() {
       setApiError("");
     } catch (error) {
       console.error("Nurse meal confirmation failed", error);
-      setApiError(
-        error?.message || "Could not save the nurse confirmation.",
-      );
+      setApiError(error?.message || "Could not save the nurse confirmation.");
       return;
     }
     const key = `${serviceDate}-${row.patient.id}-${activeMeal}`;
@@ -753,8 +748,7 @@ export default function MealDistribution() {
           foodId: item.foodId,
           servedQuantity: quantityNumber(item.quantity) ?? 0,
           unit: item.unit || "",
-          intakeStatus:
-            item.intakePercent === "Taken" ? "Taken" : "Not Taken",
+          intakeStatus: item.intakePercent === "Taken" ? "Taken" : "Not Taken",
           remark: item.foodRemark || "",
         };
       });
@@ -771,7 +765,9 @@ export default function MealDistribution() {
       setApiError("");
     } catch (error) {
       console.error("Meal intake save failed", error);
-      setApiError(error?.message || "Could not save meal intake to the server.");
+      setApiError(
+        error?.message || "Could not save meal intake to the server.",
+      );
       return;
     } finally {
       setSaving(false);
@@ -872,438 +868,548 @@ export default function MealDistribution() {
             </div>
           )}
           {counts.nurse > 0 && (
-          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-start gap-3">
-              <Bell className="mt-0.5 text-amber-600" size={20} />
+            <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <Bell className="mt-0.5 text-amber-600" size={20} />
+                <div>
+                  <h2 className="font-bold text-amber-900">
+                    Nurse Notification
+                  </h2>
+                  <p className="text-sm text-amber-800">
+                    {counts.nurse} delivered meal
+                    {counts.nurse === 1 ? " is" : "s are"} waiting for the nurse
+                    to confirm that the patient has finished the meal.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              {
+                label: "Today's Meals",
+                value: counts.total,
+                color: "var(--text-primary)",
+              },
+              {
+                label: "Packed",
+                value: counts.packed,
+                color: "var(--color-info)",
+              },
+              {
+                label: "Delivered",
+                value: counts.delivered,
+                color: "var(--hospital-primary)",
+              },
+              {
+                label: "Waiting Nurse",
+                value: counts.nurse,
+                color: "var(--color-warning)",
+              },
+              {
+                label: "Intake Pending",
+                value: counts.intake,
+                color: "var(--color-warning)",
+              },
+              {
+                label: "Intake Completed",
+                value: counts.completed,
+                color: "var(--color-success)",
+              },
+            ].map(({ label, value, color }) => (
+              <div
+                key={label}
+                className="hospital-stat-card"
+                style={{ padding: "var(--space-4)" }}
+              >
+                <div>
+                  <p className="hospital-stat-label">{label}</p>
+                  <p
+                    style={{
+                      fontSize: "1.75rem",
+                      fontWeight: 800,
+                      color,
+                      lineHeight: 1,
+                      margin: "var(--space-2) 0 0",
+                    }}
+                  >
+                    {value}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </section>
+
+          <section className="hospital-filter-panel">
+            <div className="hospital-field">
+              <label className="hospital-label">Service Date</label>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--space-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "0 var(--space-3)",
+                  background: "var(--surface)",
+                  minHeight: "var(--control-height)",
+                }}
+              >
+                <CalendarDays
+                  size={15}
+                  style={{ color: "var(--text-secondary)", flexShrink: 0 }}
+                />
+                <input
+                  type="date"
+                  value={serviceDate}
+                  onChange={(e) => setServiceDate(e.target.value)}
+                  style={{
+                    border: 0,
+                    background: "transparent",
+                    color: "var(--text-primary)",
+                    fontSize: "var(--font-body)",
+                    outline: "none",
+                  }}
+                />
+              </div>
+            </div>
+            <div className="hospital-field" style={{ flex: "2 1 220px" }}>
+              <label className="hospital-label">Search</label>
+              <div style={{ position: "relative" }}>
+                <Search
+                  size={14}
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text-secondary)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search ward or bed..."
+                  className="hospital-input"
+                  style={{ paddingLeft: 32 }}
+                />
+              </div>
+            </div>
+            <div className="hospital-field">
+              <label className="hospital-label">Ward</label>
+              <select
+                value={wardFilter}
+                onChange={(e) => setWardFilter(e.target.value)}
+                className="hospital-select"
+              >
+                <option>All Wards</option>
+                {wards.map((w) => (
+                  <option key={w}>{w}</option>
+                ))}
+              </select>
+            </div>
+            <div className="hospital-field">
+              <label className="hospital-label">Meal</label>
+              <select
+                value={mealFilter}
+                onChange={(e) => setMealFilter(e.target.value)}
+                className="hospital-select"
+              >
+                <option>All Meals</option>
+                {MEALS.map((m) => (
+                  <option key={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div className="hospital-field">
+              <label className="hospital-label">Delivery Status</label>
+              <select
+                value={deliveryFilter}
+                onChange={(e) => setDeliveryFilter(e.target.value)}
+                className="hospital-select"
+              >
+                <option>All Status</option>
+                <option>Pending</option>
+                <option>Prepared</option>
+                <option>Delivering</option>
+                <option>Delivered</option>
+              </select>
+            </div>
+          </section>
+
+          <section className="hospital-card" style={{ marginBottom: 0 }}>
+            <div className="hospital-card-header">
               <div>
-                <h2 className="font-bold text-amber-900">Nurse Notification</h2>
-                <p className="text-sm text-amber-800">
-                  {counts.nurse} delivered meal
-                  {counts.nurse === 1 ? " is" : "s are"} waiting for the nurse
-                  to confirm that the patient has finished the meal.
+                <h3 className="hospital-card-title">Meal Delivery Workflow</h3>
+                <p className="hospital-card-subtitle">
+                  Packed → Delivered → Nurse confirms → Caregiver records every
+                  food item.
                 </p>
               </div>
             </div>
-          </section>
-        )}
-
-        <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {[
-            { label: "Today's Meals",    value: counts.total,     color: "var(--text-primary)" },
-            { label: "Packed",           value: counts.packed,    color: "var(--color-info)" },
-            { label: "Delivered",        value: counts.delivered, color: "var(--hospital-primary)" },
-            { label: "Waiting Nurse",    value: counts.nurse,     color: "var(--color-warning)" },
-            { label: "Intake Pending",   value: counts.intake,    color: "var(--color-warning)" },
-            { label: "Intake Completed", value: counts.completed, color: "var(--color-success)" },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="hospital-stat-card" style={{ padding: "var(--space-4)" }}>
-              <div>
-                <p className="hospital-stat-label">{label}</p>
-                <p style={{ fontSize: "1.75rem", fontWeight: 800, color, lineHeight: 1, margin: "var(--space-2) 0 0" }}>{value}</p>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        <section className="hospital-filter-panel">
-          <div className="hospital-field">
-            <label className="hospital-label">Service Date</label>
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0 var(--space-3)", background: "var(--surface)", minHeight: "var(--control-height)" }}>
-              <CalendarDays size={15} style={{ color: "var(--text-secondary)", flexShrink: 0 }} />
-              <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} style={{ border: 0, background: "transparent", color: "var(--text-primary)", fontSize: "var(--font-body)", outline: "none" }} />
-            </div>
-          </div>
-          <div className="hospital-field" style={{ flex: "2 1 220px" }}>
-            <label className="hospital-label">Search</label>
-            <div style={{ position: "relative" }}>
-              <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)", pointerEvents: "none" }} />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search ward or bed..." className="hospital-input" style={{ paddingLeft: 32 }} />
-            </div>
-          </div>
-          <div className="hospital-field">
-            <label className="hospital-label">Ward</label>
-            <select value={wardFilter} onChange={(e) => setWardFilter(e.target.value)} className="hospital-select">
-              <option>All Wards</option>
-              {wards.map((w) => <option key={w}>{w}</option>)}
-            </select>
-          </div>
-          <div className="hospital-field">
-            <label className="hospital-label">Meal</label>
-            <select value={mealFilter} onChange={(e) => setMealFilter(e.target.value)} className="hospital-select">
-              <option>All Meals</option>
-              {MEALS.map((m) => <option key={m}>{m}</option>)}
-            </select>
-          </div>
-          <div className="hospital-field">
-            <label className="hospital-label">Delivery Status</label>
-            <select value={deliveryFilter} onChange={(e) => setDeliveryFilter(e.target.value)} className="hospital-select">
-              <option>All Status</option>
-              <option>Pending</option>
-              <option>Prepared</option>
-              <option>Delivering</option>
-              <option>Delivered</option>
-            </select>
-          </div>
-        </section>
-
-        <section className="hospital-card" style={{ marginBottom: 0 }}>
-          <div className="hospital-card-header">
-            <div>
-              <h3 className="hospital-card-title">Meal Delivery Workflow</h3>
-              <p className="hospital-card-subtitle">Packed → Delivered → Nurse confirms → Caregiver records every food item.</p>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1280px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Ward</th>
-                  <th className="px-4 py-3">Bed</th>
-                  <th className="px-4 py-3">Meal</th>
-                  <th className="px-4 py-3">Meal Items</th>
-                  <th className="px-4 py-3">Allergy / Meal Tags</th>
-                  <th className="px-4 py-3">Delivery</th>
-                  <th className="px-4 py-3">Nurse</th>
-                  <th className="px-4 py-3">Intake</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const tags = [
-                    ...allergyTags(row.patient),
-                    ...mealTags(row.patient, row.plan, row.diet),
-                  ];
-                  const isIntakeOpen =
-                    intakeOpen && selected?.patient?.id === row.patient.id;
-                  return (
-                    <React.Fragment key={`${row.patient.id}-${activeMeal}`}>
-                      <tr className="border-t align-top">
-                        <td className="px-4 py-3 font-semibold">
-                          {row.patient.ward || "—"}
-                        </td>
-                        <td className="px-4 py-3 font-semibold">
-                          {row.patient.bedNo || row.patient.bed || "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-semibold">{activeMeal}</div>
-                          <div className="text-[11px] text-slate-500">
-                            {row.diet?.name || "Diet not assigned"}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="min-w-[260px] max-w-[360px] space-y-1">
-                            {row.items.length ? (
-                              row.items.map((item) => (
-                                <div
-                                  key={item.foodId}
-                                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5"
-                                >
-                                  <span className="font-semibold text-slate-800">
-                                    {item.name}
-                                  </span>
-                                  <span className="whitespace-nowrap text-xs font-bold text-slate-600">
-                                    {item.quantity || "—"} {item.unit || ""}
-                                  </span>
-                                </div>
-                              ))
-                            ) : (
-                              <span className="text-xs text-slate-400">
-                                No meal items configured
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex max-w-[280px] flex-wrap gap-1">
-                            {tags.length ? (
-                              tags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className={`rounded-full px-2 py-1 text-[10px] font-bold ${tag.startsWith("NO ") ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}
-                                >
-                                  {tag}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-xs text-slate-400">
-                                No special tag
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!canDeliver) return;
-                              if (row.delivery === "Prepared")
-                                setDelivery(row, "Delivering");
-                              else if (row.delivery === "Delivering")
-                                setDelivery(row, "Delivered");
-                            }}
-                            disabled={
-                              !canDeliver ||
-                              !["Prepared", "Delivering"].includes(row.delivery)
-                            }
-                            className="cursor-pointer disabled:cursor-default disabled:opacity-100"
-                          >
-                            <Status text={row.delivery} />
-                          </button>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (
-                                !canNurseFinish ||
-                                row.delivery !== "Delivered" ||
-                                row.care !== "Waiting for Nurse"
-                              )
-                                return;
-                              markMealFinished(row);
-                            }}
-                            disabled={
-                              !canNurseFinish ||
-                              row.delivery !== "Delivered" ||
-                              row.care !== "Waiting for Nurse"
-                            }
-                            className="cursor-pointer disabled:cursor-default disabled:opacity-100"
-                          >
-                            <Status
-                              text={
-                                row.delivery !== "Delivered"
-                                  ? "—"
-                                  : row.care === "Waiting for Nurse"
-                                    ? "Waiting"
-                                    : "Finished"
-                              }
-                            />
-                          </button>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (
-                                row.care !== "Intake Pending" &&
-                                row.care !== "Intake Completed"
-                              )
-                                return;
-                              isIntakeOpen
-                                ? setIntakeOpen(false)
-                                : openIntake(row);
-                            }}
-                            disabled={false}
-                            className="inline-flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <Status
-                              text={
-                                row.care === "Intake Completed"
-                                  ? "Completed"
-                                  : row.care === "Intake Pending"
-                                    ? "Pending"
-                                    : "—"
-                              }
-                            />
-                            {(row.care === "Intake Pending" ||
-                              row.care === "Intake Completed") &&
-                              (isIntakeOpen ? (
-                                <ChevronUp size={14} />
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1280px] text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Ward</th>
+                    <th className="px-4 py-3">Bed</th>
+                    <th className="px-4 py-3">Meal</th>
+                    <th className="px-4 py-3">Meal Items</th>
+                    <th className="px-4 py-3">Allergy / Meal Tags</th>
+                    <th className="px-4 py-3">Delivery</th>
+                    <th className="px-4 py-3">Nurse</th>
+                    <th className="px-4 py-3">Intake</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const tags = [
+                      ...allergyTags(row.patient),
+                      ...mealTags(row.patient, row.plan, row.diet),
+                    ];
+                    const isIntakeOpen =
+                      intakeOpen && selected?.patient?.id === row.patient.id;
+                    return (
+                      <React.Fragment key={`${row.patient.id}-${activeMeal}`}>
+                        <tr className="border-t align-top">
+                          <td className="px-4 py-3 font-semibold">
+                            {row.patient.ward || "—"}
+                          </td>
+                          <td className="px-4 py-3 font-semibold">
+                            {row.patient.bedNo || row.patient.bed || "—"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-semibold">{activeMeal}</div>
+                            <div className="text-[11px] text-slate-500">
+                              {row.diet?.name || "Diet not assigned"}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="min-w-[260px] max-w-[360px] space-y-1">
+                              {row.items.length ? (
+                                row.items.map((item) => (
+                                  <div
+                                    key={item.foodId}
+                                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5"
+                                  >
+                                    <span className="font-semibold text-slate-800">
+                                      {item.name}
+                                    </span>
+                                    <span className="whitespace-nowrap text-xs font-bold text-slate-600">
+                                      {item.quantity || "—"} {item.unit || ""}
+                                    </span>
+                                  </div>
+                                ))
                               ) : (
-                                <ChevronDown size={14} />
-                              ))}
-                          </button>
-                        </td>
-                      </tr>
-                      {isIntakeOpen && (
-                        <tr className="border-t bg-slate-50">
-                          <td colSpan={8} className="p-4">
-                            <div className="rounded-xl border bg-white p-4 shadow-sm">
-                              <div className="mb-3 flex items-center justify-between">
-                                <div>
-                                  <h3 className="font-bold text-slate-900">
-                                    Item-wise Food Intake
-                                  </h3>
-                                  <p className="text-xs text-slate-500">
-                                    {row.patient.ward || "—"} • Bed{" "}
-                                    {row.patient.bedNo ||
-                                      row.patient.bed ||
-                                      "—"}{" "}
-                                    • {activeMeal}
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setIntakeOpen(false)}
-                                  className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
-                                >
-                                  <X size={16} />
-                                </button>
-                              </div>
-                              <div className="mb-3 flex flex-wrap gap-2">
-                                {tags.map((tag) => (
+                                <span className="text-xs text-slate-400">
+                                  No meal items configured
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex max-w-[280px] flex-wrap gap-1">
+                              {tags.length ? (
+                                tags.map((tag) => (
                                   <span
                                     key={tag}
                                     className={`rounded-full px-2 py-1 text-[10px] font-bold ${tag.startsWith("NO ") ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}
                                   >
                                     {tag}
                                   </span>
-                                ))}
-                              </div>
-                              <div className="overflow-x-auto rounded-lg border">
-                                <table className="w-full min-w-[760px] text-sm">
-                                  <thead className="bg-slate-50 text-xs text-slate-500">
-                                    <tr>
-                                      <th className="px-3 py-2 text-left">
-                                        Food Item
-                                      </th>
-                                      <th className="px-3 py-2 text-left">
-                                        Served
-                                      </th>
-                                      <th className="px-3 py-2 text-left">
-                                        Intake
-                                      </th>
-                                      <th className="px-3 py-2 text-left">
-                                        Consumed
-                                      </th>
-                                      <th className="px-3 py-2 text-left">
-                                        Remark
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {intakeItems.map((item) => (
-                                      <tr
-                                        key={item.foodId}
-                                        className="border-t align-top"
-                                      >
-                                        <td className="px-3 py-2 font-semibold">
-                                          {item.name}
-                                          <div className="text-[10px] font-normal text-slate-500">
-                                            {item.category}
-                                          </div>
-                                        </td>
-                                        <td className="px-3 py-2">
-                                          {item.quantity} {item.unit}
-                                        </td>
-                                        <td className="px-3 py-2">
-                                          <select
-                                            value={item.intakePercent}
-                                            onChange={(e) =>
-                                              updateIntakeItem(item.foodId, {
-                                                intakePercent: e.target.value,
-                                              })
-                                            }
-                                            className="rounded-lg border px-2 py-1.5 text-xs font-semibold"
-                                          >
-                                            {INTAKE_OPTIONS.map((x) => (
-                                              <option key={x}>{x}</option>
-                                            ))}
-                                          </select>
-                                        </td>
-                                        <td className="px-3 py-2 font-semibold">
-                                          {item.intakePercent === "Not Served"
-                                            ? "—"
-                                            : item.consumedQuantity
-                                              ? `${item.consumedQuantity} ${item.unit}`
-                                              : "—"}
-                                        </td>
-                                        <td className="px-3 py-2">
-                                          <input
-                                            value={item.foodRemark}
-                                            onChange={(e) =>
-                                              updateIntakeItem(item.foodId, {
-                                                foodRemark: e.target.value,
-                                              })
-                                            }
-                                            placeholder="Optional"
-                                            className="w-full min-w-[130px] rounded-lg border px-2 py-1.5 text-xs"
-                                          />
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                              {intakeItems.some(
-                                (x) => x.intakePercent === "Pending",
-                              ) && (
-                                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                                  Every food item must be recorded before the
-                                  intake can be completed.
-                                </div>
+                                ))
+                              ) : (
+                                <span className="text-xs text-slate-400">
+                                  No special tag
+                                </span>
                               )}
-                              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                <label className="text-xs font-semibold text-slate-600">
-                                  Meal remark
-                                  <textarea
-                                    value={intakeRemark}
-                                    onChange={(e) =>
-                                      setIntakeRemark(e.target.value)
-                                    }
-                                    className="mt-1 min-h-16 w-full rounded-lg border p-2 text-sm font-normal"
-                                    placeholder="Optional caregiver remark"
-                                  />
-                                </label>
-                                <label className="text-xs font-semibold text-slate-600">
-                                  Meal / tray issue
-                                  <select
-                                    value={issue}
-                                    onChange={(e) => setIssue(e.target.value)}
-                                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-normal"
-                                  >
-                                    <option value="">No issue</option>
-                                    <option>Wrong diet</option>
-                                    <option>Missing item</option>
-                                    <option>Wrong ward / bed</option>
-                                    <option>Food spilled</option>
-                                    <option>Food cold</option>
-                                    <option>Quantity incorrect</option>
-                                    <option>Other</option>
-                                  </select>
-                                </label>
-                              </div>
-                              <div className="mt-3 flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setIntakeOpen(false)}
-                                  className="rounded-lg border px-4 py-2 text-sm font-semibold"
-                                >
-                                  Close
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={
-                                    !canRecordIntake ||
-                                    !intakeItems.length ||
-                                    intakeItems.some(
-                                      (x) => x.intakePercent === "Pending",
-                                    )
-                                  }
-                                  onClick={saveIntake}
-                                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                                >
-                                  Save Intake
-                                </button>
-                              </div>
                             </div>
                           </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!canDeliver) return;
+                                if (row.delivery === "Prepared")
+                                  setDelivery(row, "Delivering");
+                                else if (row.delivery === "Delivering")
+                                  setDelivery(row, "Delivered");
+                              }}
+                              disabled={
+                                !canDeliver ||
+                                !["Prepared", "Delivering"].includes(
+                                  row.delivery,
+                                )
+                              }
+                              className="cursor-pointer disabled:cursor-default disabled:opacity-100"
+                            >
+                              <Status text={row.delivery} />
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (
+                                  !canNurseFinish ||
+                                  row.delivery !== "Delivered" ||
+                                  row.care !== "Waiting for Nurse"
+                                )
+                                  return;
+                                markMealFinished(row);
+                              }}
+                              disabled={
+                                !canNurseFinish ||
+                                row.delivery !== "Delivered" ||
+                                row.care !== "Waiting for Nurse"
+                              }
+                              className="cursor-pointer disabled:cursor-default disabled:opacity-100"
+                            >
+                              <Status
+                                text={
+                                  row.delivery !== "Delivered"
+                                    ? "—"
+                                    : row.care === "Waiting for Nurse"
+                                      ? "Waiting"
+                                      : "Finished"
+                                }
+                              />
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (
+                                  row.care !== "Intake Pending" &&
+                                  row.care !== "Intake Completed"
+                                )
+                                  return;
+                                isIntakeOpen
+                                  ? setIntakeOpen(false)
+                                  : openIntake(row);
+                              }}
+                              disabled={false}
+                              className="inline-flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Status
+                                text={
+                                  row.care === "Intake Completed"
+                                    ? "Completed"
+                                    : row.care === "Intake Pending"
+                                      ? "Pending"
+                                      : "—"
+                                }
+                              />
+                              {(row.care === "Intake Pending" ||
+                                row.care === "Intake Completed") &&
+                                (isIntakeOpen ? (
+                                  <ChevronUp size={14} />
+                                ) : (
+                                  <ChevronDown size={14} />
+                                ))}
+                            </button>
+                          </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-                {!rows.length && (
-                  <tr>
-                    <td colSpan={8} style={{ padding: "var(--space-8) var(--space-4)", textAlign: "center", fontSize: "var(--font-body)", color: "var(--text-secondary)" }}>
-                      No meals found for the selected date and filters.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                        {isIntakeOpen && (
+                          <tr className="border-t bg-slate-50">
+                            <td colSpan={8} className="p-4">
+                              <div className="rounded-xl border bg-white p-4 shadow-sm">
+                                <div className="mb-3 flex items-center justify-between">
+                                  <div>
+                                    <h3 className="font-bold text-slate-900">
+                                      Item-wise Food Intake
+                                    </h3>
+                                    <p className="text-xs text-slate-500">
+                                      {row.patient.ward || "—"} • Bed{" "}
+                                      {row.patient.bedNo ||
+                                        row.patient.bed ||
+                                        "—"}{" "}
+                                      • {activeMeal}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setIntakeOpen(false)}
+                                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                                <div className="mb-3 flex flex-wrap gap-2">
+                                  {tags.map((tag) => (
+                                    <span
+                                      key={tag}
+                                      className={`rounded-full px-2 py-1 text-[10px] font-bold ${tag.startsWith("NO ") ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                                <div className="overflow-x-auto rounded-lg border">
+                                  <table className="w-full min-w-[760px] text-sm">
+                                    <thead className="bg-slate-50 text-xs text-slate-500">
+                                      <tr>
+                                        <th className="px-3 py-2 text-left">
+                                          Food Item
+                                        </th>
+                                        <th className="px-3 py-2 text-left">
+                                          Served
+                                        </th>
+                                        <th className="px-3 py-2 text-left">
+                                          Intake
+                                        </th>
+                                        <th className="px-3 py-2 text-left">
+                                          Consumed
+                                        </th>
+                                        <th className="px-3 py-2 text-left">
+                                          Remark
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {intakeItems.map((item) => (
+                                        <tr
+                                          key={item.foodId}
+                                          className="border-t align-top"
+                                        >
+                                          <td className="px-3 py-2 font-semibold">
+                                            {item.name}
+                                            <div className="text-[10px] font-normal text-slate-500">
+                                              {item.category}
+                                            </div>
+                                          </td>
+                                          <td className="px-3 py-2">
+                                            {item.quantity} {item.unit}
+                                          </td>
+                                          <td className="px-3 py-2">
+                                            <select
+                                              value={item.intakePercent}
+                                              onChange={(e) =>
+                                                updateIntakeItem(item.foodId, {
+                                                  intakePercent: e.target.value,
+                                                })
+                                              }
+                                              className="rounded-lg border px-2 py-1.5 text-xs font-semibold"
+                                            >
+                                              {INTAKE_OPTIONS.map((x) => (
+                                                <option key={x}>{x}</option>
+                                              ))}
+                                            </select>
+                                          </td>
+                                          <td className="px-3 py-2 font-semibold">
+                                            {item.intakePercent === "Not Served"
+                                              ? "—"
+                                              : item.consumedQuantity
+                                                ? `${item.consumedQuantity} ${item.unit}`
+                                                : "—"}
+                                          </td>
+                                          <td className="px-3 py-2">
+                                            <input
+                                              value={item.foodRemark}
+                                              onChange={(e) =>
+                                                updateIntakeItem(item.foodId, {
+                                                  foodRemark: e.target.value,
+                                                })
+                                              }
+                                              placeholder="Optional"
+                                              className="w-full min-w-[130px] rounded-lg border px-2 py-1.5 text-xs"
+                                            />
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                                {intakeItems.some(
+                                  (x) => x.intakePercent === "Pending",
+                                ) && (
+                                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                                    Every food item must be recorded before the
+                                    intake can be completed.
+                                  </div>
+                                )}
+                                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                  <label className="text-xs font-semibold text-slate-600">
+                                    Meal remark
+                                    <textarea
+                                      value={intakeRemark}
+                                      onChange={(e) =>
+                                        setIntakeRemark(e.target.value)
+                                      }
+                                      className="mt-1 min-h-16 w-full rounded-lg border p-2 text-sm font-normal"
+                                      placeholder="Optional caregiver remark"
+                                    />
+                                  </label>
+                                  <label className="text-xs font-semibold text-slate-600">
+                                    Meal / tray issue
+                                    <select
+                                      value={issue}
+                                      onChange={(e) => setIssue(e.target.value)}
+                                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-normal"
+                                    >
+                                      <option value="">No issue</option>
+                                      <option>Wrong diet</option>
+                                      <option>Missing item</option>
+                                      <option>Wrong ward / bed</option>
+                                      <option>Food spilled</option>
+                                      <option>Food cold</option>
+                                      <option>Quantity incorrect</option>
+                                      <option>Other</option>
+                                    </select>
+                                  </label>
+                                </div>
+                                <div className="mt-3 flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setIntakeOpen(false)}
+                                    className="rounded-lg border px-4 py-2 text-sm font-semibold"
+                                  >
+                                    Close
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      !canRecordIntake ||
+                                      !intakeItems.length ||
+                                      intakeItems.some(
+                                        (x) => x.intakePercent === "Pending",
+                                      )
+                                    }
+                                    onClick={saveIntake}
+                                    className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                                  >
+                                    Save Intake
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                  {!rows.length && (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        style={{
+                          padding: "var(--space-8) var(--space-4)",
+                          textAlign: "center",
+                          fontSize: "var(--font-body)",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        No meals found for the selected date and filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </HospitalPage>
     </AppLayout>
@@ -1312,10 +1418,14 @@ export default function MealDistribution() {
 
 function Status({ text }) {
   const cls =
-    text === "Delivered" || text === "Finished" || text === "Completed" ? "hospital-status-completed" :
-    text === "Waiting" || text === "Pending" ? "hospital-status-pending" :
-    text === "Prepared" ? "hospital-status-info" :
-    text === "Delivering" ? "hospital-status-planning" :
-    "hospital-status-inactive";
+    text === "Delivered" || text === "Finished" || text === "Completed"
+      ? "hospital-status-completed"
+      : text === "Waiting" || text === "Pending"
+        ? "hospital-status-pending"
+        : text === "Prepared"
+          ? "hospital-status-info"
+          : text === "Delivering"
+            ? "hospital-status-planning"
+            : "hospital-status-inactive";
   return <span className={`hospital-status ${cls}`}>{text}</span>;
 }
