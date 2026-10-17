@@ -8,9 +8,6 @@ import "./food-master.css";
 import {
   getStore,
   setStore,
-  addRecord,
-  updateRecord,
-  deleteRecord,
   KEYS,
   STANDARD_UNITS,
   normalizeUnit,
@@ -41,7 +38,23 @@ const EMPTY = {
   unit: UNITS[0],
   status: "Active",
 };
-//const BLOCKED_KEYS = ["-", "+", "e", "E"];
+const BLOCKED_KEYS = ["-", "+", "e", "E"];
+
+// Request body used to read the food list from the backend
+const foodListPayload = (code = "") => ({
+  code,
+  name: "",
+  category: "",
+  status: null,
+  paginationInfo: {
+    currentPage: 1,
+    pageSize: 100,
+    dataSorting: {
+      byColumn: { field: "name", title: "Name", sortable: true },
+      sortingOrder: "ASC",
+    },
+  },
+});
 
 export default function FoodMasterTab() {
   const [data, setData] = useState([]);
@@ -104,23 +117,20 @@ export default function FoodMasterTab() {
     return candidates.sort((a, b) => b.length - a.length)[0] || [];
   };
 
+  // ============================================================
+  // LOAD: the database is the source of truth
+  // ============================================================
   const load = async () => {
     try {
-      const response = await foodService.getAllFood({
-        code: "",
-        name: "",
-        category: "",
-        status: null,
-        paginationInfo: {
-          currentPage: 1,
-          pageSize: 100,
-          dataSorting: {
-            byColumn: { field: "name", title: "Name", sortable: true },
-            sortingOrder: "ASC",
-          },
-        },
-      });
-      const apiRows = extractRows(response)
+      const response = await foodService.getAllFood(foodListPayload());
+
+      // TEMP DEBUG: shows which fields the backend returns for a food.
+      // Remove this line once the serving quantity issue is solved.
+      console.log("FOOD ROW FROM API:", response?.data?.dataList?.[0]);
+
+      const apiRows = (
+        Array.isArray(response?.data?.dataList) ? response.data.dataList : []
+      )
         .map((item) => ({
           ...item,
           id: item.id ?? item.foodId ?? item.food_id,
@@ -145,16 +155,10 @@ export default function FoodMasterTab() {
             const old = existing.find(
               (item) =>
                 Number(item.backendFoodId ?? item.id) ===
-                  Number(row.backendFoodId) ||
-                String(item.code || "").toLowerCase() ===
-                  String(row.code || "").toLowerCase(),
+                Number(row.backendFoodId),
             );
-            const hasNutrition =
-              old?.nutritionLoaded ||
-              old?.nutritionId != null ||
-              ["calories", "protein", "carbs", "fat", "fiber"].some(
-                (key) => Number(old?.[key]) > 0,
-              );
+
+            // Last known values are used only if the nutrition request fails
             let nutrition = old
               ? {
                   calories: old.calories,
@@ -165,44 +169,53 @@ export default function FoodMasterTab() {
                   id: old.nutritionId,
                 }
               : {};
-            let nutritionLoaded = Boolean(hasNutrition);
-            if (!hasNutrition) {
-              try {
-                const nutritionResponse =
-                  await foodNutritionService.getNutritionById(
-                    row.backendFoodId,
-                  );
-                nutrition =
-                  extractRows(nutritionResponse)[0] ||
-                  nutritionResponse?.data ||
-                  nutritionResponse?.result ||
-                  nutritionResponse ||
-                  {};
+            let nutritionLoaded = false;
+
+            // Always read the latest nutrition from the database
+            try {
+              const nutritionResponse =
+                await foodNutritionService.getNutritionById(row.backendFoodId);
+              nutrition =
+                extractRows(nutritionResponse)[0] ||
+                nutritionResponse?.data ||
+                nutritionResponse?.result ||
+                nutritionResponse ||
+                {};
+              nutritionLoaded = true;
+            } catch (nutritionError) {
+              if (nutritionError?.status === 404) {
+                // Food has no nutrition row yet
+                nutrition = {};
                 nutritionLoaded = true;
-              } catch (error) {
-                if (error?.status === 404) {
-                  nutritionLoaded = true;
-                } else {
-                  console.warn(
-                    `Unable to load nutrition for food ${row.backendFoodId}.`,
-                    error,
-                  );
-                }
+              } else {
+                console.warn(
+                  `Unable to load nutrition for food ${row.backendFoodId}.`,
+                  nutritionError,
+                );
               }
             }
+
             return {
               ...old,
               ...row,
               nutritionLoaded,
-              id: old?.id ?? row.id,
+              id: row.id,
               backendFoodId: Number(row.backendFoodId),
-              calories: Number(nutrition.calories ?? old?.calories ?? 0),
-              protein: Number(nutrition.protein ?? old?.protein ?? 0),
-              carbs: Number(
-                nutrition.carbohydrates ?? nutrition.carbs ?? old?.carbs ?? 0,
-              ),
-              fat: Number(nutrition.fat ?? old?.fat ?? 0),
-              fiber: Number(nutrition.fiber ?? old?.fiber ?? 0),
+              // Serving quantity: use whatever field name the backend returns
+              standardQuantity:
+                Number(
+                  row.standardQuantity ??
+                    row.standard_quantity ??
+                    row.servingSize ??
+                    row.serving_size ??
+                    row.quantity ??
+                    old?.standardQuantity,
+                ) || undefined,
+              calories: Number(nutrition.calories ?? 0),
+              protein: Number(nutrition.protein ?? 0),
+              carbs: Number(nutrition.carbohydrates ?? nutrition.carbs ?? 0),
+              fat: Number(nutrition.fat ?? 0),
+              fiber: Number(nutrition.fiber ?? 0),
               ...(nutrition.id != null
                 ? { nutritionId: Number(nutrition.id) }
                 : {}),
@@ -213,14 +226,16 @@ export default function FoodMasterTab() {
         setData(merged);
         return;
       }
-    } catch (error) {
-      console.warn(
-        "Food API unavailable; using current-session data only.",
-        error,
-      );
+
+      // API succeeded but there are no foods
+      setStore(KEYS.FOOD_MASTER, []);
+      setData([]);
+    } catch (loadError) {
+      console.error("Food load failed:", loadError);
+      setData([]);
     }
-    setData(getStore(KEYS.FOOD_MASTER, []) || []);
   };
+
   useEffect(() => {
     load();
   }, []);
@@ -233,9 +248,16 @@ export default function FoodMasterTab() {
   };
 
   // ============================================================
-  // API: CREATE FOOD + SAVE FOOD NUTRITION
+  // SAVE: create/update food, then save its nutrition
   // ============================================================
   const save = async () => {
+    setError(""); // clear any old message
+
+    if (!String(form.name || "").trim()) {
+      setError("Item name is required.");
+      return;
+    }
+
     const standardQuantity = positiveQuantity(form.standardQuantity);
     const unit = normalizeUnit(form.unit);
 
@@ -268,6 +290,11 @@ export default function FoodMasterTab() {
       name: String(form.name || "").trim(),
       category: String(form.category || "").trim(),
       unit,
+      // Sent so it can be stored if the backend has this field.
+      // If the backend has no such field it is ignored, and the quantity
+      // will still be blank after a reload (needs a backend column).
+      // If the backend rejects unknown fields (400), delete this line.
+      standardQuantity,
       description: String(form.description || "").trim(),
       status: form.status === "Active",
     };
@@ -308,7 +335,7 @@ export default function FoodMasterTab() {
         foodResponse?.result ||
         foodResponse ||
         {};
-      const foodId = Number(
+      let foodId = Number(
         foodRecord?.id ??
           foodRecord?.foodId ??
           foodRecord?.food_id ??
@@ -316,106 +343,136 @@ export default function FoodMasterTab() {
           editing?.id,
       );
 
+      // The create response may not include the new id, so look the food up by code
+      if (!Number.isFinite(foodId) || foodId <= 0) {
+        const lookup = await foodService.getAllFood(
+          foodListPayload(commonFoodPayload.code),
+        );
+        const match = (lookup?.data?.dataList || []).find(
+          (f) =>
+            String(f.code || "").toLowerCase() ===
+            commonFoodPayload.code.toLowerCase(),
+        );
+        foodId = Number(match?.id);
+      }
+
+      if (!Number.isFinite(foodId) || foodId <= 0) {
+        throw new Error(
+          "The food was saved, but its id could not be found, so nutrition was not saved.",
+        );
+      }
+
       // --------------------------------------------------------
       // SAVE / UPDATE NUTRITION
       // --------------------------------------------------------
-      let nutritionId = editing?.nutritionId;
-      if (Number.isFinite(foodId) && foodId > 0) {
-        const nutritionPayload = {
-          foodId,
-          calories: Number(form.calories || 0),
-          protein: Number(form.protein || 0),
-          carbohydrates: Number(form.carbs || 0),
-          fat: Number(form.fat || 0),
-          fiber: Number(form.fiber || 0),
-        };
+      const nutritionPayload = {
+        foodId,
+        calories: Number(form.calories || 0),
+        protein: Number(form.protein || 0),
+        carbohydrates: Number(form.carbs || 0),
+        fat: Number(form.fat || 0),
+        fiber: Number(form.fiber || 0),
+      };
 
-        if (nutritionId) {
-          await foodNutritionService.updateNutritionById(
-            nutritionId,
-            nutritionPayload,
-          );
-        } else {
-          try {
-            const nutritionResponse =
-              await foodNutritionService.saveNutrition(nutritionPayload);
-            const nutritionRecord =
-              extractRows(nutritionResponse)[0] ||
-              nutritionResponse?.data ||
-              nutritionResponse?.result ||
-              nutritionResponse ||
-              {};
-            nutritionId = nutritionRecord?.id ?? nutritionId;
-          } catch (nutritionError) {
-            const existingNutrition =
-              await foodNutritionService.getNutritionById(foodId);
-            const nutritionRecord =
-              extractRows(existingNutrition)[0] ||
-              existingNutrition?.data ||
-              existingNutrition?.result ||
-              existingNutrition ||
-              {};
-            if (nutritionRecord?.id) {
-              nutritionId = nutritionRecord.id;
-              await foodNutritionService.updateNutritionById(
-                nutritionId,
-                nutritionPayload,
-              );
-            } else {
-              throw nutritionError;
-            }
+      if (editing?.nutritionId) {
+        // The backend update endpoint expects the FOOD id
+        await foodNutritionService.updateNutritionById(
+          foodId,
+          nutritionPayload,
+        );
+      } else {
+        try {
+          await foodNutritionService.saveNutrition(nutritionPayload);
+        } catch (nutritionError) {
+          // Nutrition may already exist for this food: update it instead
+          const existingNutrition =
+            await foodNutritionService.getNutritionById(foodId);
+          const nutritionRecord =
+            extractRows(existingNutrition)[0] ||
+            existingNutrition?.data ||
+            existingNutrition?.result ||
+            existingNutrition ||
+            {};
+          if (nutritionRecord?.id) {
+            await foodNutritionService.updateNutritionById(
+              foodId,
+              nutritionPayload,
+            );
+          } else {
+            throw nutritionError;
           }
         }
       }
 
-      // --------------------------------------------------------
-      // EXISTING LOCAL STORAGE
-      // --------------------------------------------------------
-      const d = {
-        ...form,
-        ...(Number.isFinite(foodId) && foodId > 0
-          ? { backendFoodId: Number(foodId) }
-          : {}),
-        ...(nutritionId ? { nutritionId: Number(nutritionId) } : {}),
-        calories: Number(form.calories || 0),
-        protein: Number(form.protein || 0),
-        carbs: Number(form.carbs || 0),
-        fat: Number(form.fat || 0),
-        fiber: Number(form.fiber || 0),
-        standardQuantity,
-        unit,
-      };
-
-      editing
-        ? updateRecord(KEYS.FOOD_MASTER, editing.id, d)
-        : addRecord(KEYS.FOOD_MASTER, d);
-
       setIsOpen(false);
-      setData(getStore(KEYS.FOOD_MASTER, []) || []);
-    } catch (error) {
-      console.error("Food API Error:", error);
+      await load(); // re-read from the database so ids and nutrition are real
+    } catch (saveError) {
+      console.error("Food API Error:", saveError);
+      // Modal stays open; the message shows in the red box. Nothing is saved locally.
+      setError(saveError?.message || "Failed to save food item.");
+    }
+  };
 
-      // Do not break existing UI/local functionality
-      const d = {
-        ...form,
-        calories: Number(form.calories || 0),
-        protein: Number(form.protein || 0),
-        carbs: Number(form.carbs || 0),
-        fat: Number(form.fat || 0),
-        fiber: Number(form.fiber || 0),
-        standardQuantity,
-        unit,
-      };
+  // ============================================================
+  // DELETE: nutrition row first, then the food
+  // ============================================================
+  const confirmDelete = async () => {
+    try {
+      const backendId = deleting.backendFoodId ?? deleting.id;
 
-      editing
-        ? updateRecord(KEYS.FOOD_MASTER, editing.id, d)
-        : addRecord(KEYS.FOOD_MASTER, d);
+      // Nutrition has a unique food_id relationship, so resolve and
+      // remove the nutrition row before deleting the parent Food row.
+      let nutritionId = deleting.nutritionId;
+      if (!nutritionId && !deleting.nutritionLoaded) {
+        try {
+          const nutritionResponse =
+            await foodNutritionService.getNutritionById(backendId);
+          const nutritionRecord =
+            extractRows(nutritionResponse)[0] ||
+            nutritionResponse?.data ||
+            nutritionResponse?.result ||
+            nutritionResponse ||
+            {};
+          nutritionId = nutritionRecord?.id;
+        } catch (lookupError) {
+          if (lookupError?.status !== 404) throw lookupError;
+        }
+      }
 
-      setIsOpen(false);
-      setData(getStore(KEYS.FOOD_MASTER, []) || []);
-      alert(
-        `Food item was saved locally because the server request failed: ${error?.message || "Unknown API error."}`,
-      );
+      if (nutritionId) {
+        const nutritionResponse =
+          await foodNutritionService.deleteNutrition(nutritionId);
+        if (
+          nutritionResponse?.error ||
+          nutritionResponse?.statusCode >= 400 ||
+          nutritionResponse?.status >= 400
+        ) {
+          throw new Error(
+            nutritionResponse?.message ||
+              nutritionResponse?.error?.message ||
+              "Failed to delete food nutrition.",
+          );
+        }
+      }
+
+      const response = await foodService.deleteFood(backendId);
+      if (
+        response?.error ||
+        response?.statusCode >= 400 ||
+        response?.status >= 400
+      ) {
+        throw new Error(
+          response?.message ||
+            response?.error?.message ||
+            "Failed to delete food item",
+        );
+      }
+
+      setDeleting(null);
+      await load(); // refresh from the database
+    } catch (deleteError) {
+      console.error("Food delete API Error:", deleteError);
+      alert(deleteError?.message || "Unable to delete Food Item.");
     }
   };
 
@@ -674,64 +731,7 @@ export default function FoodMasterTab() {
         <ConfirmDialog
           isOpen={true}
           onClose={closeDelete}
-          onConfirm={async () => {
-            try {
-              const backendId = deleting.backendFoodId ?? deleting.id;
-              // Nutrition has a unique food_id relationship, so resolve and
-              // remove the nutrition row before deleting the parent Food row.
-              let nutritionId = deleting.nutritionId;
-              if (!nutritionId && !deleting.nutritionLoaded) {
-                try {
-                  const nutritionResponse =
-                    await foodNutritionService.getNutritionById(backendId);
-                  const nutritionRecord =
-                    extractRows(nutritionResponse)[0] ||
-                    nutritionResponse?.data ||
-                    nutritionResponse?.result ||
-                    nutritionResponse ||
-                    {};
-                  nutritionId = nutritionRecord?.id;
-                } catch (error) {
-                  if (error?.status !== 404) throw error;
-                }
-              }
-
-              if (nutritionId) {
-                const nutritionResponse =
-                  await foodNutritionService.deleteNutrition(nutritionId);
-                if (
-                  nutritionResponse?.error ||
-                  nutritionResponse?.statusCode >= 400 ||
-                  nutritionResponse?.status >= 400
-                ) {
-                  throw new Error(
-                    nutritionResponse?.message ||
-                      nutritionResponse?.error?.message ||
-                      "Failed to delete food nutrition.",
-                  );
-                }
-              }
-
-              const response = await foodService.deleteFood(backendId);
-              if (
-                response?.error ||
-                response?.statusCode >= 400 ||
-                response?.status >= 400
-              ) {
-                throw new Error(
-                  response?.message ||
-                    response?.error?.message ||
-                    "Failed to delete food item",
-                );
-              }
-              deleteRecord(KEYS.FOOD_MASTER, deleting.id);
-              setDeleting(null);
-              setData(getStore(KEYS.FOOD_MASTER, []) || []);
-            } catch (error) {
-              console.error("Food delete API Error:", error);
-              alert(error?.message || "Unable to delete Food Item.");
-            }
-          }}
+          onConfirm={confirmDelete}
           title="Delete Food Item"
           message={`Delete "${deleting.name}"?`}
         />

@@ -131,8 +131,10 @@ function extractRows(response) {
   };
 
   walk(response);
-  candidates.sort((a, b) => b.score - a.score || b.rows.length - a.rows.length);
-  return candidates[0]?.rows || [];
+  // Ignore arrays that don't contain any template-like keys (e.g. `columns`)
+  const valid = candidates.filter((c) => c.score > 0);
+  valid.sort((a, b) => b.score - a.score || b.rows.length - a.rows.length);
+  return valid[0]?.rows || [];
 }
 
 function extractTotal(response, fallback) {
@@ -557,13 +559,21 @@ export default function DietTemplateTab() {
       );
     }
 
-    const rows = extractRows(response)
+    // This API returns: { data: { columns: [...], pagination: {...}, dataList: [...] } }
+    // Read ONLY dataList. `columns` is table metadata, not template rows.
+    const list = Array.isArray(response?.data?.dataList)
+      ? response.data.dataList
+      : [];
+
+    const rows = list
       .map((item, index) => normalizeTemplateRecord(item, index))
       .filter(Boolean);
 
+    const apiTotal = Number(response?.data?.pagination?.totalRecords);
+
     return {
       rows,
-      total: extractTotal(response, rows.length),
+      total: Number.isFinite(apiTotal) ? apiTotal : rows.length,
     };
   };
 
@@ -989,10 +999,6 @@ export default function DietTemplateTab() {
     }
     if (!payload.code) {
       alert("Diet Template Code is required.");
-      return null;
-    }
-    if (!payload.dietTypeId) {
-      alert("Select the Diet Plan this template belongs to.");
       return null;
     }
     if (
@@ -1991,28 +1997,6 @@ function DietTemplateEditor({ diet, onClose, onSave }) {
               onChange={(e) => setForm({ ...form, code: e.target.value })}
               className="hospital-input"
             />
-          </div>
-          <div>
-            <label
-              className="hospital-label"
-              style={{ display: "block", marginBottom: "var(--space-1)" }}
-            >
-              Diet Plan
-            </label>
-            <select
-              value={form.dietTypeId ?? ""}
-              onChange={(e) => setForm({ ...form, dietTypeId: e.target.value })}
-              className="hospital-select"
-            >
-              <option value="">Select diet plan</option>
-              {dietTypeOptions
-                .filter((t) => t.status !== false)
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-            </select>
           </div>
           <div>
             <label
